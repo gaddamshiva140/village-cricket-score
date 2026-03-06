@@ -1,20 +1,59 @@
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArrowLeft, Trophy, Star } from 'lucide-react';
-import { getMatch, getOversString, getRunRate } from '@/lib/matchStore';
+import { getMatch, getOversString, getRunRate, saveMatch } from '@/lib/matchStore';
+import { Match } from '@/types/cricket';
+import PlayerOfTheMatch from '@/components/PlayerOfTheMatch';
 
 export default function Scorecard() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const match = id ? getMatch(id) : null;
+  const [searchParams] = useSearchParams();
+  const [match, setMatch] = useState<Match | null>(null);
+  const [showPOTM, setShowPOTM] = useState(false);
+
+  useEffect(() => {
+    if (id) {
+      const m = getMatch(id);
+      setMatch(m);
+      if (m && searchParams.get('potm') === 'true' && !m.playerOfTheMatch) {
+        setShowPOTM(true);
+      }
+    }
+  }, [id, searchParams]);
 
   if (!match) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4">
         <p className="text-muted-foreground">Match not found</p>
         <Link to="/"><Button>Go Home</Button></Link>
+      </div>
+    );
+  }
+
+  if (showPOTM) {
+    return (
+      <div className="min-h-screen pb-24">
+        <div className="cricket-gradient px-4 pb-6 pt-12 text-primary-foreground">
+          <div className="mx-auto max-w-lg">
+            <h1 className="text-xl font-black">{match.setup.title}</h1>
+            <p className="text-sm opacity-80 mt-1">{match.result}</p>
+          </div>
+        </div>
+        <div className="mx-auto max-w-lg px-4 -mt-3">
+          <Card className="p-4">
+            <PlayerOfTheMatch
+              match={match}
+              onComplete={(updatedMatch) => {
+                setMatch({ ...updatedMatch });
+                setShowPOTM(false);
+              }}
+            />
+          </Card>
+        </div>
       </div>
     );
   }
@@ -31,7 +70,7 @@ export default function Scorecard() {
           <p className="text-sm opacity-80">{match.setup.groundName} • {match.setup.date}</p>
           {match.result && (
             <div className="mt-3 flex items-center gap-2 rounded-lg bg-primary-foreground/20 p-3">
-              <Trophy className="h-5 w-5 text-cricket-gold" />
+              <Trophy className="h-5 w-5 text-primary" />
               <span className="font-bold text-sm">{match.result}</span>
             </div>
           )}
@@ -39,6 +78,21 @@ export default function Scorecard() {
       </div>
 
       <div className="mx-auto max-w-lg px-4 -mt-3 space-y-4">
+        {/* Player of the Match */}
+        {match.playerOfTheMatchName && (
+          <Card className="p-4 border-2 border-primary/30 bg-primary/5">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                <Star className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground font-medium">🏆 Player of the Match</p>
+                <p className="font-black text-lg">{match.playerOfTheMatchName}</p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {match.innings.map((innings, inningsIdx) => {
           if (innings.ballEvents.length === 0 && inningsIdx === 1) return null;
 
@@ -86,14 +140,19 @@ export default function Scorecard() {
                           .map(b => (
                             <TableRow key={b.playerId}>
                               <TableCell className="text-xs py-2">
-                                <div>
-                                  <span className="font-medium">{b.playerName}</span>
-                                  {b.isOut && (
-                                    <span className="block text-[10px] text-muted-foreground">{b.dismissalType}</span>
-                                  )}
-                                  {!b.isOut && b.balls > 0 && (
-                                    <span className="block text-[10px] text-primary">not out</span>
-                                  )}
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">
+                                    {b.playerName.charAt(0)}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">{b.playerName}</span>
+                                    {b.isOut && (
+                                      <span className="block text-[10px] text-muted-foreground">{b.dismissalType}</span>
+                                    )}
+                                    {!b.isOut && b.balls > 0 && (
+                                      <span className="block text-[10px] text-primary">not out</span>
+                                    )}
+                                  </div>
                                 </div>
                               </TableCell>
                               <TableCell className="text-xs text-right font-bold py-2">{b.runs}</TableCell>
@@ -141,7 +200,14 @@ export default function Scorecard() {
                             const econ = totalBalls > 0 ? ((b.runs / totalBalls) * 6).toFixed(1) : '-';
                             return (
                               <TableRow key={b.playerId}>
-                                <TableCell className="text-xs font-medium py-2">{b.playerName}</TableCell>
+                                <TableCell className="text-xs font-medium py-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">
+                                      {b.playerName.charAt(0)}
+                                    </div>
+                                    {b.playerName}
+                                  </div>
+                                </TableCell>
                                 <TableCell className="text-xs text-right py-2">{b.overs}.{b.balls}</TableCell>
                                 <TableCell className="text-xs text-right py-2">{b.runs}</TableCell>
                                 <TableCell className="text-xs text-right font-bold py-2">{b.wickets}</TableCell>
@@ -157,6 +223,17 @@ export default function Scorecard() {
             </div>
           );
         })}
+
+        {/* Select POTM button if not yet selected */}
+        {match.status === 'completed' && !match.playerOfTheMatch && (
+          <Button
+            onClick={() => setShowPOTM(true)}
+            className="w-full h-14 text-lg font-black rounded-xl"
+            size="lg"
+          >
+            🏆 Select Player of the Match
+          </Button>
+        )}
       </div>
     </div>
   );
