@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Plus, X, Crown, Camera } from 'lucide-react';
+import { ArrowLeft, Crown, Camera, Pencil, Check } from 'lucide-react';
 import { MatchSetup, Player } from '@/types/cricket';
 import { createMatch } from '@/lib/matchStore';
 import CoinToss from '@/components/CoinToss';
@@ -15,7 +15,15 @@ interface PlayerEntry {
   name: string;
   isCaptain: boolean;
   photoUrl?: string;
+  isEditing: boolean;
 }
+
+const createDefaultPlayers = (): PlayerEntry[] =>
+  Array.from({ length: 11 }, (_, i) => ({
+    name: `Player ${i + 1}`,
+    isCaptain: false,
+    isEditing: false,
+  }));
 
 export default function CreateMatch() {
   const navigate = useNavigate();
@@ -28,31 +36,25 @@ export default function CreateMatch() {
   const [useCustomOvers, setUseCustomOvers] = useState(false);
   const [teamAName, setTeamAName] = useState('');
   const [teamBName, setTeamBName] = useState('');
-  const [teamAPlayers, setTeamAPlayers] = useState<PlayerEntry[]>([]);
-  const [teamBPlayers, setTeamBPlayers] = useState<PlayerEntry[]>([]);
-  const [newPlayerA, setNewPlayerA] = useState('');
-  const [newPlayerB, setNewPlayerB] = useState('');
+  const [teamAPlayers, setTeamAPlayers] = useState<PlayerEntry[]>(createDefaultPlayers());
+  const [teamBPlayers, setTeamBPlayers] = useState<PlayerEntry[]>(createDefaultPlayers());
   const fileInputRefA = useRef<HTMLInputElement>(null);
   const fileInputRefB = useRef<HTMLInputElement>(null);
   const [pendingPhotoTeam, setPendingPhotoTeam] = useState<'A' | 'B'>('A');
   const [pendingPhotoIndex, setPendingPhotoIndex] = useState<number>(-1);
 
-  const addPlayer = (team: 'A' | 'B') => {
-    const name = team === 'A' ? newPlayerA : newPlayerB;
-    if (!name.trim()) return;
-    const entry: PlayerEntry = { name: name.trim(), isCaptain: false };
-    if (team === 'A') {
-      setTeamAPlayers([...teamAPlayers, entry]);
-      setNewPlayerA('');
-    } else {
-      setTeamBPlayers([...teamBPlayers, entry]);
-      setNewPlayerB('');
-    }
+  const toggleEdit = (team: 'A' | 'B', index: number) => {
+    const update = (players: PlayerEntry[]) =>
+      players.map((p, i) => (i === index ? { ...p, isEditing: !p.isEditing } : p));
+    if (team === 'A') setTeamAPlayers(update(teamAPlayers));
+    else setTeamBPlayers(update(teamBPlayers));
   };
 
-  const removePlayer = (team: 'A' | 'B', index: number) => {
-    if (team === 'A') setTeamAPlayers(teamAPlayers.filter((_, i) => i !== index));
-    else setTeamBPlayers(teamBPlayers.filter((_, i) => i !== index));
+  const updatePlayerName = (team: 'A' | 'B', index: number, name: string) => {
+    const update = (players: PlayerEntry[]) =>
+      players.map((p, i) => (i === index ? { ...p, name } : p));
+    if (team === 'A') setTeamAPlayers(update(teamAPlayers));
+    else setTeamBPlayers(update(teamBPlayers));
   };
 
   const toggleCaptain = (team: 'A' | 'B', index: number) => {
@@ -113,13 +115,12 @@ export default function CreateMatch() {
   };
 
   const canProceedStep0 = teamAName.trim() && teamBName.trim();
-  const canProceedStep1 = teamAPlayers.length >= 2 && teamBPlayers.length >= 2;
 
   return (
     <div className="min-h-screen pb-24">
-      {/* Hidden file inputs */}
-      <input ref={fileInputRefA} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
-      <input ref={fileInputRefB} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+      {/* Hidden file inputs with camera capture */}
+      <input ref={fileInputRefA} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoChange} />
+      <input ref={fileInputRefB} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoChange} />
 
       <div className="cricket-gradient px-4 pb-6 pt-12 text-primary-foreground">
         <div className="mx-auto max-w-lg">
@@ -183,7 +184,7 @@ export default function CreateMatch() {
                 </div>
               </div>
               <Button onClick={() => setStep(1)} disabled={!canProceedStep0} className="w-full font-bold">
-                Next: Add Players
+                Next: Edit Players
               </Button>
             </CardContent>
           </Card>
@@ -194,8 +195,6 @@ export default function CreateMatch() {
             {(['A', 'B'] as const).map(team => {
               const players = team === 'A' ? teamAPlayers : teamBPlayers;
               const name = team === 'A' ? teamAName : teamBName;
-              const newP = team === 'A' ? newPlayerA : newPlayerB;
-              const setNewP = team === 'A' ? setNewPlayerA : setNewPlayerB;
 
               return (
                 <Card key={team}>
@@ -205,7 +204,7 @@ export default function CreateMatch() {
                   <CardContent className="space-y-2">
                     {players.map((p, i) => (
                       <div key={i} className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
-                        {/* Photo */}
+                        {/* Photo with camera */}
                         <button
                           onClick={() => handlePhotoClick(team, i)}
                           className="relative w-9 h-9 rounded-full bg-secondary flex items-center justify-center shrink-0 overflow-hidden border-2 border-border hover:border-primary transition-colors"
@@ -217,10 +216,29 @@ export default function CreateMatch() {
                           )}
                         </button>
                         <span className="text-xs font-bold text-muted-foreground w-5">{i + 1}</span>
-                        <span className="flex-1 text-sm font-medium">
-                          {p.name}
-                          {p.isCaptain && <span className="text-primary ml-1 text-xs font-bold">(C)</span>}
-                        </span>
+                        {/* Editable name */}
+                        {p.isEditing ? (
+                          <Input
+                            value={p.name}
+                            onChange={e => updatePlayerName(team, i, e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && toggleEdit(team, i)}
+                            className="flex-1 h-8 text-sm"
+                            autoFocus
+                          />
+                        ) : (
+                          <span className="flex-1 text-sm font-medium truncate">
+                            {p.name}
+                            {p.isCaptain && <span className="text-primary ml-1 text-xs font-bold">(C)</span>}
+                          </span>
+                        )}
+                        {/* Edit / Confirm toggle */}
+                        <button
+                          onClick={() => toggleEdit(team, i)}
+                          className="p-1 rounded text-muted-foreground hover:text-primary transition-colors"
+                          title={p.isEditing ? 'Confirm' : 'Edit name'}
+                        >
+                          {p.isEditing ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                        </button>
                         {/* Captain toggle */}
                         <button
                           onClick={() => toggleCaptain(team, i)}
@@ -229,29 +247,14 @@ export default function CreateMatch() {
                         >
                           <Crown className="h-4 w-4" />
                         </button>
-                        <button onClick={() => removePlayer(team, i)} className="text-muted-foreground hover:text-destructive">
-                          <X className="h-4 w-4" />
-                        </button>
                       </div>
                     ))}
-                    <div className="flex gap-2">
-                      <Input
-                        value={newP}
-                        onChange={e => setNewP(e.target.value)}
-                        placeholder="Player name"
-                        onKeyDown={e => e.key === 'Enter' && addPlayer(team)}
-                        className="text-sm"
-                      />
-                      <Button size="icon" variant="outline" onClick={() => addPlayer(team)}>
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Min 2 players • Tap 📷 to add photo • Tap 👑 to set captain</p>
+                    <p className="text-xs text-muted-foreground">Tap 📷 to add photo • ✏️ to edit name • 👑 to set captain</p>
                   </CardContent>
                 </Card>
               );
             })}
-            <Button onClick={() => setStep(2)} disabled={!canProceedStep1} className="w-full font-bold">
+            <Button onClick={() => setStep(2)} className="w-full font-bold">
               Next: Coin Toss 🪙
             </Button>
           </div>
