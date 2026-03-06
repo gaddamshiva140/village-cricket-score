@@ -73,6 +73,7 @@ export interface InningsData {
   currentBowlerIndex: number; // index in bowlingFigures
   isCompleted: boolean;
   target?: number; // only for 2nd innings
+  lastOverBowlerIndex?: number; // track last over's bowler to prevent consecutive overs
 }
 
 export interface MatchSetup {
@@ -85,6 +86,7 @@ export interface MatchSetup {
   teamA: { name: string; players: Player[] };
   teamB: { name: string; players: Player[] };
   tossWinner: 'A' | 'B';
+  tossCall?: 'heads' | 'tails';
   battingFirst: 'A' | 'B';
 }
 
@@ -95,7 +97,8 @@ export interface Match {
   currentInnings: 0 | 1;
   status: 'live' | 'completed' | 'abandoned';
   result?: string;
-  playerOfTheMatch?: string;
+  playerOfTheMatch?: string; // player id
+  playerOfTheMatchName?: string;
   createdAt: number;
   updatedAt: number;
 }

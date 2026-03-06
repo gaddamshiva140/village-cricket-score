@@ -4,11 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Plus, X, Shuffle } from 'lucide-react';
+import { ArrowLeft, Plus, X } from 'lucide-react';
 import { MatchSetup, Player } from '@/types/cricket';
 import { createMatch } from '@/lib/matchStore';
+import CoinToss from '@/components/CoinToss';
 
-const OVERS_OPTIONS = [6, 10, 15, 20];
+const OVERS_OPTIONS = [6, 8, 10, 12, 20];
 
 export default function CreateMatch() {
   const navigate = useNavigate();
@@ -17,12 +18,12 @@ export default function CreateMatch() {
   const [groundName, setGroundName] = useState('');
   const [villageName, setVillageName] = useState('');
   const [totalOvers, setTotalOvers] = useState(10);
+  const [customOvers, setCustomOvers] = useState('');
+  const [useCustomOvers, setUseCustomOvers] = useState(false);
   const [teamAName, setTeamAName] = useState('');
   const [teamBName, setTeamBName] = useState('');
-  const [teamAPlayers, setTeamAPlayers] = useState<string[]>(['', '']);
-  const [teamBPlayers, setTeamBPlayers] = useState<string[]>(['', '']);
-  const [tossWinner, setTossWinner] = useState<'A' | 'B'>('A');
-  const [battingFirst, setBattingFirst] = useState<'A' | 'B'>('A');
+  const [teamAPlayers, setTeamAPlayers] = useState<string[]>([]);
+  const [teamBPlayers, setTeamBPlayers] = useState<string[]>([]);
   const [newPlayerA, setNewPlayerA] = useState('');
   const [newPlayerB, setNewPlayerB] = useState('');
 
@@ -30,10 +31,10 @@ export default function CreateMatch() {
     const name = team === 'A' ? newPlayerA : newPlayerB;
     if (!name.trim()) return;
     if (team === 'A') {
-      setTeamAPlayers([...teamAPlayers.filter(p => p), name.trim()]);
+      setTeamAPlayers([...teamAPlayers, name.trim()]);
       setNewPlayerA('');
     } else {
-      setTeamBPlayers([...teamBPlayers.filter(p => p), name.trim()]);
+      setTeamBPlayers([...teamBPlayers, name.trim()]);
       setNewPlayerB('');
     }
   };
@@ -43,16 +44,13 @@ export default function CreateMatch() {
     else setTeamBPlayers(teamBPlayers.filter((_, i) => i !== index));
   };
 
-  const handleStart = () => {
+  const effectiveOvers = useCustomOvers ? (parseInt(customOvers) || 10) : totalOvers;
+
+  const handleTossComplete = (tossWinner: 'A' | 'B', tossCall: 'heads' | 'tails', battingFirst: 'A' | 'B') => {
     const makePlayer = (name: string): Player => ({
       id: crypto.randomUUID(),
       name,
     });
-
-    const filteredA = teamAPlayers.filter(p => p.trim());
-    const filteredB = teamBPlayers.filter(p => p.trim());
-
-    if (filteredA.length < 2 || filteredB.length < 2) return;
 
     const setup: MatchSetup = {
       id: crypto.randomUUID(),
@@ -60,10 +58,11 @@ export default function CreateMatch() {
       groundName: groundName || 'Village Ground',
       villageName,
       date: new Date().toISOString().split('T')[0],
-      totalOvers,
-      teamA: { name: teamAName || 'Team A', players: filteredA.map(makePlayer) },
-      teamB: { name: teamBName || 'Team B', players: filteredB.map(makePlayer) },
+      totalOvers: effectiveOvers,
+      teamA: { name: teamAName || 'Team A', players: teamAPlayers.map(makePlayer) },
+      teamB: { name: teamBName || 'Team B', players: teamBPlayers.map(makePlayer) },
       tossWinner,
+      tossCall,
       battingFirst,
     };
 
@@ -72,7 +71,7 @@ export default function CreateMatch() {
   };
 
   const canProceedStep0 = teamAName.trim() && teamBName.trim();
-  const canProceedStep1 = teamAPlayers.filter(p => p.trim()).length >= 2 && teamBPlayers.filter(p => p.trim()).length >= 2;
+  const canProceedStep1 = teamAPlayers.length >= 2 && teamBPlayers.length >= 2;
 
   return (
     <div className="min-h-screen pb-24">
@@ -113,18 +112,36 @@ export default function CreateMatch() {
               </div>
               <div>
                 <Label>Overs</Label>
-                <div className="flex gap-2 mt-1">
+                <div className="flex gap-2 mt-1 flex-wrap">
                   {OVERS_OPTIONS.map(o => (
                     <Button
                       key={o}
-                      variant={totalOvers === o ? 'default' : 'outline'}
-                      className="flex-1 font-bold"
-                      onClick={() => setTotalOvers(o)}
+                      variant={!useCustomOvers && totalOvers === o ? 'default' : 'outline'}
+                      className="font-bold px-4"
+                      onClick={() => { setTotalOvers(o); setUseCustomOvers(false); }}
                     >
                       {o}
                     </Button>
                   ))}
+                  <Button
+                    variant={useCustomOvers ? 'default' : 'outline'}
+                    className="font-bold px-4"
+                    onClick={() => setUseCustomOvers(true)}
+                  >
+                    Custom
+                  </Button>
                 </div>
+                {useCustomOvers && (
+                  <Input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={customOvers}
+                    onChange={e => setCustomOvers(e.target.value)}
+                    placeholder="Enter overs (1-50)"
+                    className="mt-2"
+                  />
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -145,7 +162,7 @@ export default function CreateMatch() {
 
         {step === 1 && (
           <div className="space-y-4 animate-fade-in">
-            {['A', 'B'].map(team => {
+            {(['A', 'B'] as const).map(team => {
               const players = team === 'A' ? teamAPlayers : teamBPlayers;
               const name = team === 'A' ? teamAName : teamBName;
               const newP = team === 'A' ? newPlayerA : newPlayerB;
@@ -157,11 +174,11 @@ export default function CreateMatch() {
                     <CardTitle className="text-base">{name || `Team ${team}`} Players</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    {players.filter(p => p.trim()).map((p, i) => (
+                    {players.map((p, i) => (
                       <div key={i} className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
                         <span className="text-xs font-bold text-muted-foreground w-5">{i + 1}</span>
                         <span className="flex-1 text-sm font-medium">{p}</span>
-                        <button onClick={() => removePlayer(team as 'A' | 'B', i)} className="text-muted-foreground hover:text-destructive">
+                        <button onClick={() => removePlayer(team, i)} className="text-muted-foreground hover:text-destructive">
                           <X className="h-4 w-4" />
                         </button>
                       </div>
@@ -171,10 +188,10 @@ export default function CreateMatch() {
                         value={newP}
                         onChange={e => setNewP(e.target.value)}
                         placeholder="Player name"
-                        onKeyDown={e => e.key === 'Enter' && addPlayer(team as 'A' | 'B')}
+                        onKeyDown={e => e.key === 'Enter' && addPlayer(team)}
                         className="text-sm"
                       />
-                      <Button size="icon" variant="outline" onClick={() => addPlayer(team as 'A' | 'B')}>
+                      <Button size="icon" variant="outline" onClick={() => addPlayer(team)}>
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
@@ -184,7 +201,7 @@ export default function CreateMatch() {
               );
             })}
             <Button onClick={() => setStep(2)} disabled={!canProceedStep1} className="w-full font-bold">
-              Next: Toss
+              Next: Coin Toss 🪙
             </Button>
           </div>
         )}
@@ -192,44 +209,14 @@ export default function CreateMatch() {
         {step === 2 && (
           <Card className="animate-fade-in">
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Shuffle className="h-5 w-5" /> Toss & Innings
-              </CardTitle>
+              <CardTitle className="text-lg">🪙 Coin Toss</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Toss Winner</Label>
-                <div className="grid grid-cols-2 gap-2 mt-1">
-                  {(['A', 'B'] as const).map(t => (
-                    <Button
-                      key={t}
-                      variant={tossWinner === t ? 'default' : 'outline'}
-                      onClick={() => setTossWinner(t)}
-                      className="font-bold"
-                    >
-                      {t === 'A' ? teamAName : teamBName}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <Label>Batting First</Label>
-                <div className="grid grid-cols-2 gap-2 mt-1">
-                  {(['A', 'B'] as const).map(t => (
-                    <Button
-                      key={t}
-                      variant={battingFirst === t ? 'default' : 'outline'}
-                      onClick={() => setBattingFirst(t)}
-                      className="font-bold"
-                    >
-                      {t === 'A' ? teamAName : teamBName}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <Button onClick={handleStart} className="w-full h-14 text-lg font-black" size="lg">
-                🏏 Start Match
-              </Button>
+            <CardContent>
+              <CoinToss
+                teamAName={teamAName || 'Team A'}
+                teamBName={teamBName || 'Team B'}
+                onTossComplete={handleTossComplete}
+              />
             </CardContent>
           </Card>
         )}

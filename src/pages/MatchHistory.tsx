@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Trophy, Trash2 } from 'lucide-react';
+import { ArrowLeft, Trophy, Trash2, Star } from 'lucide-react';
 import { getAllMatches, getOversString, deleteMatch } from '@/lib/matchStore';
 import { useState } from 'react';
 import { Match } from '@/types/cricket';
@@ -45,8 +45,8 @@ export default function MatchHistory() {
                     <div className="flex items-center gap-2">
                       {match.status === 'live' && (
                         <span className="flex h-2 w-2">
-                          <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-cricket-red opacity-75" />
-                          <span className="relative inline-flex h-2 w-2 rounded-full bg-cricket-red" />
+                          <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-destructive opacity-75" />
+                          <span className="relative inline-flex h-2 w-2 rounded-full bg-destructive" />
                         </span>
                       )}
                       <h3 className="font-bold text-sm">{match.setup.teamA.name} vs {match.setup.teamB.name}</h3>
@@ -66,8 +66,14 @@ export default function MatchHistory() {
                     </div>
                     {match.result && (
                       <div className="flex items-center gap-1 mt-2">
-                        <Trophy className="h-3 w-3 text-cricket-gold" />
+                        <Trophy className="h-3 w-3 text-primary" />
                         <span className="text-xs font-semibold text-primary">{match.result}</span>
+                      </div>
+                    )}
+                    {match.playerOfTheMatchName && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <Star className="h-3 w-3 text-primary" />
+                        <span className="text-xs text-muted-foreground">POTM: {match.playerOfTheMatchName}</span>
                       </div>
                     )}
                   </div>

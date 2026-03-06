@@ -7,6 +7,7 @@ import { ArrowLeft, Undo2, RotateCcw, UserRound } from 'lucide-react';
 import { getMatch, recordBall, undoLastBall, getCurrentInnings, getOversString, getRunRate, changeBowler, swapStrike, saveMatch, setActiveMatchId } from '@/lib/matchStore';
 import { Match, BallType, DismissalType } from '@/types/cricket';
 import CricketAnimation from '@/components/CricketAnimation';
+import OversProgress from '@/components/OversProgress';
 
 const DISMISSAL_TYPES: DismissalType[] = ['Bowled', 'Caught', 'LBW', 'Run Out', 'Stumped', 'Hit Wicket'];
 
@@ -17,8 +18,10 @@ export default function LiveScoring() {
   const [showExtras, setShowExtras] = useState(false);
   const [showWicket, setShowWicket] = useState(false);
   const [showBowlerSelect, setShowBowlerSelect] = useState(false);
+  const [bowlerSelectRequired, setBowlerSelectRequired] = useState(false);
   const [extraType, setExtraType] = useState<'noball' | 'wide' | 'legbye'>('noball');
   const [animation, setAnimation] = useState<'four' | 'six' | 'wicket' | 'fifty' | 'hundred' | null>(null);
+  const [overCompleteMessage, setOverCompleteMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -35,19 +38,39 @@ export default function LiveScoring() {
 
   const handleScore = useCallback((runs: number, ballType: BallType = 'normal', isWicket = false, dismissalType?: DismissalType) => {
     if (!match) return;
+    
+    const inningsBefore = match.currentInnings;
+    const ballsBefore = getCurrentInnings(match).totalBalls;
+    
     const result = recordBall(match, runs, ballType, isWicket, dismissalType);
     if (result.animationType) {
       setAnimation(result.animationType);
     }
     setMatch({ ...result.match });
+
+    // Check if match completed -> go to POTM selection
     if (result.match.status === 'completed') {
       setTimeout(() => {
         setActiveMatchId(null);
-        navigate(`/scorecard/${match.id}`);
+        navigate(`/scorecard/${match.id}?potm=true`);
       }, result.animationType ? 2500 : 500);
+      return;
     }
+
     // Check if innings just switched
-    if (result.match.currentInnings === 1 && match.currentInnings === 0) {
+    if (result.match.currentInnings === 1 && inningsBefore === 0) {
+      setBowlerSelectRequired(true);
+      setShowBowlerSelect(true);
+      return;
+    }
+
+    // Check if over just completed (ball was legal and totalBalls is now divisible by 6)
+    const currentInnings = getCurrentInnings(result.match);
+    const isLegal = ballType !== 'wide' && ballType !== 'noball';
+    if (isLegal && currentInnings.totalBalls > 0 && currentInnings.totalBalls % 6 === 0 && !currentInnings.isCompleted) {
+      const completedOver = Math.floor(currentInnings.totalBalls / 6);
+      setOverCompleteMessage(`Over ${completedOver} Completed!`);
+      setBowlerSelectRequired(true);
       setShowBowlerSelect(true);
     }
   }, [match, navigate]);
@@ -66,10 +89,22 @@ export default function LiveScoring() {
 
   const handleChangeBowler = useCallback((idx: number) => {
     if (!match) return;
+    const innings = getCurrentInnings(match);
+    
+    // Prevent same bowler bowling consecutive overs
+    if (bowlerSelectRequired && innings.lastOverBowlerIndex !== undefined && idx === innings.lastOverBowlerIndex) {
+      return; // Don't allow
+    }
+    
+    // Track last over's bowler
+    innings.lastOverBowlerIndex = innings.currentBowlerIndex;
+    
     const updated = changeBowler(match, idx);
     setMatch({ ...updated });
     setShowBowlerSelect(false);
-  }, [match]);
+    setBowlerSelectRequired(false);
+    setOverCompleteMessage(null);
+  }, [match, bowlerSelectRequired]);
 
   if (!match) return <div className="flex items-center justify-center min-h-screen"><p>Loading...</p></div>;
 
@@ -77,12 +112,6 @@ export default function LiveScoring() {
   const striker = innings.battingOrder[innings.currentBatsmanIndex];
   const nonStriker = innings.battingOrder[innings.nonStrikerIndex];
   const bowler = innings.bowlingFigures[innings.currentBowlerIndex];
-
-  // Recent balls in current over
-  const currentOverBalls = innings.ballEvents.filter(
-    e => e.overNumber === Math.floor(innings.totalBalls / 6) ||
-      (innings.totalBalls % 6 === 0 && innings.totalBalls > 0 && e.overNumber === Math.floor(innings.totalBalls / 6) - 1)
-  ).slice(-8);
 
   const recentBalls = innings.ballEvents.slice(-6);
 
@@ -108,7 +137,7 @@ export default function LiveScoring() {
               <span className="text-2xl font-bold opacity-70">/{innings.totalWickets}</span>
             </div>
             <div className="flex items-center justify-center gap-4 text-sm opacity-80">
-              <span>Overs: {getOversString(innings.totalBalls)}</span>
+              <span>Overs: {getOversString(innings.totalBalls)} / {match.setup.totalOvers}</span>
               <span>RR: {getRunRate(innings.totalRuns, innings.totalBalls)}</span>
             </div>
             {innings.target && (
@@ -121,27 +150,38 @@ export default function LiveScoring() {
       </div>
 
       <div className="mx-auto max-w-lg px-4 -mt-2 space-y-3">
+        {/* Overs Progress Bar */}
+        <Card className="p-3">
+          <OversProgress totalBalls={innings.totalBalls} totalOvers={match.setup.totalOvers} />
+        </Card>
+
         {/* Batsmen & Bowler */}
         <Card className="p-3">
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
-                <span className="text-primary font-bold">🏏</span>
+                <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
+                  {striker?.playerName?.charAt(0) || '?'}
+                </div>
                 <span className="font-bold">{striker?.playerName || '-'}</span>
-                <span className="text-xs text-muted-foreground">*</span>
+                <span className="text-xs text-primary font-bold">*</span>
               </div>
               <span className="font-mono font-bold">{striker?.runs} ({striker?.balls})</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
-                <span className="opacity-50">🏏</span>
+                <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
+                  {nonStriker?.playerName?.charAt(0) || '?'}
+                </div>
                 <span className="text-muted-foreground">{nonStriker?.playerName || '-'}</span>
               </div>
               <span className="font-mono text-muted-foreground">{nonStriker?.runs} ({nonStriker?.balls})</span>
             </div>
             <div className="border-t pt-2 flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
-                <span>⚾</span>
+                <div className="w-7 h-7 rounded-full bg-destructive/20 flex items-center justify-center text-xs font-bold text-destructive">
+                  {bowler?.playerName?.charAt(0) || '?'}
+                </div>
                 <span className="text-muted-foreground">{bowler?.playerName || '-'}</span>
               </div>
               <span className="font-mono text-muted-foreground">
@@ -159,18 +199,18 @@ export default function LiveScoring() {
               key={ball.id}
               className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold shrink-0 ${
                 ball.isWicket
-                  ? 'bg-cricket-red text-primary-foreground'
+                  ? 'bg-destructive text-destructive-foreground'
                   : ball.ballType === 'wide'
                   ? 'bg-muted text-muted-foreground border border-border'
                   : ball.ballType === 'noball'
-                  ? 'bg-cricket-gold/20 text-cricket-gold border border-cricket-gold/50'
+                  ? 'bg-accent text-accent-foreground border border-border'
                   : ball.runs === 4
-                  ? 'bg-cricket-sky/20 text-cricket-sky border border-cricket-sky/50'
+                  ? 'bg-primary/20 text-primary border border-primary/50'
                   : ball.runs === 6
-                  ? 'bg-cricket-gold/20 text-cricket-gold border border-cricket-gold/50'
+                  ? 'bg-accent text-accent-foreground border border-accent'
                   : ball.runs === 0
                   ? 'bg-muted text-muted-foreground'
-                  : 'bg-accent text-accent-foreground'
+                  : 'bg-secondary text-secondary-foreground'
               }`}
             >
               {ball.isWicket ? 'W' : ball.ballType === 'wide' ? `${ball.runs}wd` : ball.ballType === 'noball' ? `${ball.batsmanRuns}nb` : ball.ballType === 'legbye' ? `${ball.runs}lb` : ball.runs}
@@ -194,13 +234,13 @@ export default function LiveScoring() {
 
         <div className="grid grid-cols-3 gap-2">
           <Button
-            className="h-14 text-xl font-black rounded-xl bg-cricket-sky hover:bg-cricket-sky/80 text-primary-foreground"
+            className="h-14 text-xl font-black rounded-xl bg-primary hover:bg-primary/80 text-primary-foreground"
             onClick={() => handleScore(4)}
           >
             4
           </Button>
           <Button
-            className="h-14 text-xl font-black rounded-xl bg-cricket-gold hover:bg-cricket-gold/80 text-secondary-foreground"
+            className="h-14 text-xl font-black rounded-xl bg-accent hover:bg-accent/80 text-accent-foreground"
             onClick={() => handleScore(6)}
           >
             6
@@ -234,7 +274,7 @@ export default function LiveScoring() {
           <Button variant="ghost" className="text-xs rounded-xl h-10" onClick={handleSwapStrike}>
             <RotateCcw className="h-4 w-4 mr-1" /> Swap
           </Button>
-          <Button variant="ghost" className="text-xs rounded-xl h-10" onClick={() => setShowBowlerSelect(true)}>
+          <Button variant="ghost" className="text-xs rounded-xl h-10" onClick={() => { setBowlerSelectRequired(false); setShowBowlerSelect(true); }}>
             <UserRound className="h-4 w-4 mr-1" /> Bowler
           </Button>
         </div>
@@ -306,23 +346,43 @@ export default function LiveScoring() {
       </Dialog>
 
       {/* Bowler Select Dialog */}
-      <Dialog open={showBowlerSelect} onOpenChange={setShowBowlerSelect}>
-        <DialogContent className="max-w-sm">
+      <Dialog open={showBowlerSelect} onOpenChange={(open) => {
+        if (!open && bowlerSelectRequired) return; // Don't allow closing if required
+        setShowBowlerSelect(open);
+      }}>
+        <DialogContent className="max-w-sm" onPointerDownOutside={bowlerSelectRequired ? (e) => e.preventDefault() : undefined}>
           <DialogHeader>
-            <DialogTitle>Select Bowler</DialogTitle>
+            <DialogTitle>
+              {overCompleteMessage ? (
+                <div className="space-y-1">
+                  <span className="block text-primary">{overCompleteMessage}</span>
+                  <span className="block text-sm font-normal text-muted-foreground">Select Next Bowler</span>
+                </div>
+              ) : 'Select Bowler'}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-2 max-h-60 overflow-y-auto">
-            {innings.bowlingFigures.map((b, i) => (
-              <Button
-                key={b.playerId}
-                variant={i === innings.currentBowlerIndex ? 'default' : 'outline'}
-                className="w-full justify-between font-medium rounded-xl"
-                onClick={() => handleChangeBowler(i)}
-              >
-                <span>{b.playerName}</span>
-                <span className="font-mono text-xs">{b.overs}.{b.balls}-{b.runs}-{b.wickets}</span>
-              </Button>
-            ))}
+            {innings.bowlingFigures.map((b, i) => {
+              const isLastOverBowler = bowlerSelectRequired && innings.lastOverBowlerIndex !== undefined && i === innings.lastOverBowlerIndex;
+              return (
+                <Button
+                  key={b.playerId}
+                  variant={i === innings.currentBowlerIndex ? 'default' : 'outline'}
+                  className={`w-full justify-between font-medium rounded-xl ${isLastOverBowler ? 'opacity-40' : ''}`}
+                  onClick={() => handleChangeBowler(i)}
+                  disabled={isLastOverBowler}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-bold shrink-0">
+                      {b.playerName.charAt(0)}
+                    </div>
+                    <span>{b.playerName}</span>
+                    {isLastOverBowler && <span className="text-[10px] text-muted-foreground">(bowled last over)</span>}
+                  </div>
+                  <span className="font-mono text-xs">{b.overs}.{b.balls}-{b.runs}-{b.wickets}</span>
+                </Button>
+              );
+            })}
           </div>
         </DialogContent>
       </Dialog>
