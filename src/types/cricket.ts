@@ -7,6 +7,8 @@ export interface Player {
   name: string;
   role?: PlayerRole;
   battingStyle?: BattingStyle;
+  isCaptain?: boolean;
+  photoUrl?: string; // base64 data URL
 }
 
 export interface BatsmanScore {
