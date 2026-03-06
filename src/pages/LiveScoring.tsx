@@ -3,11 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, Undo2, RotateCcw, UserRound } from 'lucide-react';
-import { getMatch, recordBall, undoLastBall, getCurrentInnings, getOversString, getRunRate, changeBowler, swapStrike, saveMatch, setActiveMatchId } from '@/lib/matchStore';
+import { ArrowLeft, Undo2, RotateCcw, UserRound, LogOut } from 'lucide-react';
+import { getMatch, recordBall, undoLastBall, getCurrentInnings, getOversString, getRunRate, changeBowler, swapStrike, saveMatch, setActiveMatchId, retireOut } from '@/lib/matchStore';
 import { Match, BallType, DismissalType } from '@/types/cricket';
 import CricketAnimation from '@/components/CricketAnimation';
 import OversProgress from '@/components/OversProgress';
+import WinPrediction from '@/components/WinPrediction';
 
 const DISMISSAL_TYPES: DismissalType[] = ['Bowled', 'Caught', 'LBW', 'Run Out', 'Stumped', 'Hit Wicket'];
 
@@ -49,7 +50,6 @@ export default function LiveScoring() {
     }
     setMatch({ ...result.match });
 
-    // Check if match completed -> go to POTM selection
     if (result.match.status === 'completed') {
       setTimeout(() => {
         setActiveMatchId(null);
@@ -58,7 +58,6 @@ export default function LiveScoring() {
       return;
     }
 
-    // After wicket, show next batsman selection (if not all out / innings not over)
     if (isWicket) {
       const currentInnings = getCurrentInnings(result.match);
       const availableBatsmen = currentInnings.battingOrder.filter((b, i) =>
@@ -73,14 +72,12 @@ export default function LiveScoring() {
       }
     }
 
-    // Check if innings just switched
     if (result.match.currentInnings === 1 && inningsBefore === 0) {
       setBowlerSelectRequired(true);
       setShowBowlerSelect(true);
       return;
     }
 
-    // Check if over just completed
     const currentInnings = getCurrentInnings(result.match);
     const isLegal = ballType !== 'wide' && ballType !== 'noball';
     if (isLegal && currentInnings.totalBalls > 0 && currentInnings.totalBalls % 6 === 0 && !currentInnings.isCompleted) {
@@ -91,10 +88,35 @@ export default function LiveScoring() {
     }
   }, [match, navigate]);
 
+  const handleRetireOut = useCallback(() => {
+    if (!match) return;
+    const result = retireOut(match);
+    setMatch({ ...result.match });
+
+    if (result.match.status === 'completed') {
+      setTimeout(() => {
+        setActiveMatchId(null);
+        navigate(`/scorecard/${match.id}?potm=true`);
+      }, 500);
+      return;
+    }
+
+    if (result.needsNextBatsman) {
+      setShowNextBatsman(true);
+    }
+  }, [match, navigate]);
+
   const handleSelectNextBatsman = useCallback((batsmanIndex: number) => {
     if (!match) return;
     const innings = getCurrentInnings(match);
     innings.currentBatsmanIndex = batsmanIndex;
+    // Update current partnership with correct batsman
+    const newBatsman = innings.battingOrder[batsmanIndex];
+    const nonStriker = innings.battingOrder[innings.nonStrikerIndex];
+    innings.currentPartnership.batsman1Id = newBatsman.playerId;
+    innings.currentPartnership.batsman1Name = newBatsman.playerName;
+    innings.currentPartnership.batsman2Id = nonStriker.playerId;
+    innings.currentPartnership.batsman2Name = nonStriker.playerName;
     match.updatedAt = Date.now();
     saveMatch(match);
     setMatch({ ...match });
@@ -138,12 +160,16 @@ export default function LiveScoring() {
   const bowler = innings.bowlingFigures[innings.currentBowlerIndex];
   const strikerPlayer = innings.players.find(p => p.id === striker?.playerId);
   const nonStrikerPlayer = innings.players.find(p => p.id === nonStriker?.playerId);
-  // bowler is from other team
   const bowlingTeamPlayers = match.currentInnings === 0
     ? (match.setup.battingFirst === 'A' ? match.setup.teamB.players : match.setup.teamA.players)
     : (match.setup.battingFirst === 'A' ? match.setup.teamA.players : match.setup.teamB.players);
   const bowlerPlayer = bowlingTeamPlayers.find(p => p.id === bowler?.playerId);
 
+  const currentOverBalls = innings.ballEvents.filter(e => {
+    const currentOver = Math.floor(innings.totalBalls / 6);
+    const ballOver = innings.totalBalls % 6 === 0 && innings.totalBalls > 0 ? currentOver - 1 : currentOver;
+    return e.overNumber === (innings.totalBalls % 6 === 0 && innings.totalBalls > 0 ? currentOver : ballOver);
+  });
   const recentBalls = innings.ballEvents.slice(-6);
 
   const PlayerAvatar = ({ player, size = 'w-7 h-7', textSize = 'text-xs' }: { player?: { name: string; photoUrl?: string }; size?: string; textSize?: string }) => (
@@ -194,6 +220,9 @@ export default function LiveScoring() {
           <OversProgress totalBalls={innings.totalBalls} totalOvers={match.setup.totalOvers} />
         </Card>
 
+        {/* Win Prediction */}
+        <WinPrediction match={match} />
+
         {/* Batsmen & Bowler */}
         <Card className="p-3">
           <div className="space-y-2">
@@ -214,6 +243,15 @@ export default function LiveScoring() {
               </div>
               <span className="font-mono text-muted-foreground">{nonStriker?.runs} ({nonStriker?.balls})</span>
             </div>
+
+            {/* Partnership */}
+            <div className="border-t pt-2 flex items-center justify-between text-xs text-muted-foreground">
+              <span>Partnership</span>
+              <span className="font-mono font-bold text-foreground">
+                {innings.currentPartnership.runs} runs ({innings.currentPartnership.balls} balls)
+              </span>
+            </div>
+
             <div className="border-t pt-2 flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-full bg-destructive/20 flex items-center justify-center shrink-0 overflow-hidden">
@@ -230,6 +268,17 @@ export default function LiveScoring() {
                 {bowler?.overs}.{bowler?.balls}-{bowler?.runs}-{bowler?.wickets}
               </span>
             </div>
+          </div>
+        </Card>
+
+        {/* Extras Display */}
+        <Card className="p-2 flex items-center justify-between text-xs">
+          <span className="font-medium text-muted-foreground">Extras: {innings.extras.total}</span>
+          <div className="flex gap-2 text-muted-foreground">
+            <span>NB:{innings.extras.noBalls}</span>
+            <span>WD:{innings.extras.wides}</span>
+            <span>LB:{innings.extras.legByes}</span>
+            <span>B:{innings.extras.byes}</span>
           </div>
         </Card>
 
@@ -270,10 +319,13 @@ export default function LiveScoring() {
         </div>
 
         {/* Extras & Controls */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           <Button variant="outline" className="text-xs font-bold rounded-xl h-11" onClick={() => { setExtraType('noball'); setShowExtras(true); }}>No Ball</Button>
           <Button variant="outline" className="text-xs font-bold rounded-xl h-11" onClick={() => { setExtraType('wide'); setShowExtras(true); }}>Wide</Button>
           <Button variant="outline" className="text-xs font-bold rounded-xl h-11" onClick={() => { setExtraType('legbye'); setShowExtras(true); }}>Leg Bye</Button>
+          <Button variant="outline" className="text-xs font-bold rounded-xl h-11 text-destructive border-destructive/30" onClick={handleRetireOut}>
+            <LogOut className="h-3 w-3 mr-1" /> Retire
+          </Button>
         </div>
 
         <div className="grid grid-cols-3 gap-2">
@@ -337,7 +389,7 @@ export default function LiveScoring() {
 
       {/* Next Batsman Dialog */}
       <Dialog open={showNextBatsman} onOpenChange={(open) => {
-        if (!open) return; // Don't allow closing
+        if (!open) return;
         setShowNextBatsman(open);
       }}>
         <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
