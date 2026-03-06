@@ -377,6 +377,53 @@ export function swapStrike(match: Match): Match {
   return match;
 }
 
+export function retireOut(match: Match): { match: Match; needsNextBatsman: boolean } {
+  const innings = getCurrentInnings(match);
+  const striker = innings.battingOrder[innings.currentBatsmanIndex];
+  
+  striker.isOut = true;
+  striker.dismissalType = 'Retired Out';
+  innings.totalWickets += 1;
+
+  // End current partnership
+  innings.currentPartnership.isActive = false;
+  innings.partnerships.push({ ...innings.currentPartnership });
+
+  // Find next batsman
+  const nextBatIdx = innings.battingOrder.findIndex((b, i) =>
+    i !== innings.currentBatsmanIndex && i !== innings.nonStrikerIndex && !b.isOut
+  );
+
+  let needsNextBatsman = false;
+  if (nextBatIdx >= 0) {
+    innings.currentBatsmanIndex = nextBatIdx;
+    const newBatsman = innings.battingOrder[nextBatIdx];
+    const nonStriker = innings.battingOrder[innings.nonStrikerIndex];
+    innings.currentPartnership = {
+      runs: 0, balls: 0,
+      batsman1Id: newBatsman.playerId, batsman1Name: newBatsman.playerName,
+      batsman2Id: nonStriker.playerId, batsman2Name: nonStriker.playerName,
+      wicketNumber: innings.totalWickets,
+      isActive: true,
+    };
+    needsNextBatsman = true;
+  } else {
+    // All out
+    innings.isCompleted = true;
+    if (match.currentInnings === 0) {
+      match.currentInnings = 1;
+      match.innings[1].target = innings.totalRuns + 1;
+    } else {
+      match.status = 'completed';
+      match.result = calculateResult(match);
+    }
+  }
+
+  match.updatedAt = Date.now();
+  saveMatch(match);
+  return { match, needsNextBatsman };
+}
+
 export function deleteMatch(id: string) {
   const matches = getAllMatches().filter(m => m.id !== id);
   localStorage.setItem(MATCHES_KEY, JSON.stringify(matches));
