@@ -225,12 +225,26 @@ export function recordBall(
     innings.totalWickets += 1;
     bowler.wickets += 1;
 
+    // End current partnership
+    innings.currentPartnership.isActive = false;
+    innings.partnerships.push({ ...innings.currentPartnership });
+
     // Next batsman
     const nextBatIdx = innings.battingOrder.findIndex((b, i) =>
       i !== innings.currentBatsmanIndex && i !== innings.nonStrikerIndex && !b.isOut
     );
     if (nextBatIdx >= 0) {
       innings.currentBatsmanIndex = nextBatIdx;
+      // Start new partnership
+      const newBatsman = innings.battingOrder[nextBatIdx];
+      const nonStriker = innings.battingOrder[innings.nonStrikerIndex];
+      innings.currentPartnership = {
+        runs: 0, balls: 0,
+        batsman1Id: newBatsman.playerId, batsman1Name: newBatsman.playerName,
+        batsman2Id: nonStriker.playerId, batsman2Name: nonStriker.playerName,
+        wicketNumber: innings.totalWickets,
+        isActive: true,
+      };
     }
   }
 
