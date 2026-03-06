@@ -1,6 +1,6 @@
 export type PlayerRole = 'Batsman' | 'Bowler' | 'All-Rounder' | 'Wicket Keeper';
 export type BattingStyle = 'Right Hand' | 'Left Hand';
-export type DismissalType = 'Bowled' | 'Caught' | 'LBW' | 'Run Out' | 'Stumped' | 'Hit Wicket' | 'Retired';
+export type DismissalType = 'Bowled' | 'Caught' | 'LBW' | 'Run Out' | 'Stumped' | 'Hit Wicket' | 'Retired Out';
 
 export interface Player {
   id: string;
@@ -76,6 +76,19 @@ export interface InningsData {
   isCompleted: boolean;
   target?: number; // only for 2nd innings
   lastOverBowlerIndex?: number; // track last over's bowler to prevent consecutive overs
+  partnerships: Partnership[];
+  currentPartnership: Partnership;
+}
+
+export interface Partnership {
+  runs: number;
+  balls: number;
+  batsman1Id: string;
+  batsman1Name: string;
+  batsman2Id: string;
+  batsman2Name: string;
+  wicketNumber: number;
+  isActive: boolean;
 }
 
 export interface MatchSetup {

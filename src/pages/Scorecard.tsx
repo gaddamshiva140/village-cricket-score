@@ -8,6 +8,7 @@ import { getMatch, getOversString, getRunRate, saveMatch } from '@/lib/matchStor
 import { Match } from '@/types/cricket';
 import PlayerOfTheMatch from '@/components/PlayerOfTheMatch';
 import { generateMatchPDF } from '@/lib/pdfGenerator';
+import MatchAnalytics from '@/components/MatchAnalytics';
 
 export default function Scorecard() {
   const { id } = useParams<{ id: string }>();
@@ -172,7 +173,8 @@ export default function Scorecard() {
                                       {b.playerName}
                                       {getPlayerCaptain(b.playerId) && <span className="text-primary ml-1">(C)</span>}
                                     </span>
-                                    {b.isOut && <span className="block text-[10px] text-muted-foreground">{b.dismissalType}</span>}
+                                    {b.isOut && b.dismissalType === 'Retired Out' && <span className="block text-[10px] text-secondary">Retired Out</span>}
+                                    {b.isOut && b.dismissalType !== 'Retired Out' && <span className="block text-[10px] text-muted-foreground">{b.dismissalType}</span>}
                                     {!b.isOut && b.balls > 0 && <span className="block text-[10px] text-primary">not out</span>}
                                   </div>
                                 </div>
@@ -195,6 +197,25 @@ export default function Scorecard() {
               <div className="px-1 text-xs text-muted-foreground">
                 Extras: {innings.extras.total} (WD: {innings.extras.wides}, NB: {innings.extras.noBalls}, LB: {innings.extras.legByes}, B: {innings.extras.byes})
               </div>
+
+              {/* Partnerships */}
+              {innings.partnerships && innings.partnerships.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm">Partnerships</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-0 space-y-2">
+                    {innings.partnerships.map((p, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">
+                          {i + 1}{i === 0 ? 'st' : i === 1 ? 'nd' : i === 2 ? 'rd' : 'th'} Wicket
+                        </span>
+                        <span className="font-mono font-bold">{p.runs} runs ({p.balls} balls)</span>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Bowling */}
               <Card>
@@ -242,6 +263,9 @@ export default function Scorecard() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Analytics */}
+              <MatchAnalytics innings={innings} label={`${innings.teamName} ${inningsIdx === 0 ? '1st' : '2nd'} Innings`} />
             </div>
           );
         })}

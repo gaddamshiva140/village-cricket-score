@@ -51,6 +51,17 @@ function createInnings(teamName: string, teamId: string, players: Player[], bowl
     wides: 0,
   }));
 
+  const initialPartnership = {
+    runs: 0,
+    balls: 0,
+    batsman1Id: players[0]?.id || '',
+    batsman1Name: players[0]?.name || '',
+    batsman2Id: players[1]?.id || '',
+    batsman2Name: players[1]?.name || '',
+    wicketNumber: 0,
+    isActive: true,
+  };
+
   return {
     teamName,
     teamId,
@@ -68,6 +79,8 @@ function createInnings(teamName: string, teamId: string, players: Player[], bowl
     currentBowlerIndex: 0,
     isCompleted: false,
     target,
+    partnerships: [],
+    currentPartnership: initialPartnership,
   };
 }
 
@@ -191,6 +204,10 @@ export function recordBall(
   if (ballType === 'bye') innings.extras.byes += runs;
   innings.extras.total += extras;
 
+  // Update partnership
+  innings.currentPartnership.runs += totalRunsForBall;
+  innings.currentPartnership.balls += isLegal ? 1 : 0;
+
   // Determine animation
   let animationType: 'four' | 'six' | 'wicket' | 'fifty' | 'hundred' | undefined;
   if (isWicket) animationType = 'wicket';
@@ -208,12 +225,26 @@ export function recordBall(
     innings.totalWickets += 1;
     bowler.wickets += 1;
 
+    // End current partnership
+    innings.currentPartnership.isActive = false;
+    innings.partnerships.push({ ...innings.currentPartnership });
+
     // Next batsman
     const nextBatIdx = innings.battingOrder.findIndex((b, i) =>
       i !== innings.currentBatsmanIndex && i !== innings.nonStrikerIndex && !b.isOut
     );
     if (nextBatIdx >= 0) {
       innings.currentBatsmanIndex = nextBatIdx;
+      // Start new partnership
+      const newBatsman = innings.battingOrder[nextBatIdx];
+      const nonStriker = innings.battingOrder[innings.nonStrikerIndex];
+      innings.currentPartnership = {
+        runs: 0, balls: 0,
+        batsman1Id: newBatsman.playerId, batsman1Name: newBatsman.playerName,
+        batsman2Id: nonStriker.playerId, batsman2Name: nonStriker.playerName,
+        wicketNumber: innings.totalWickets,
+        isActive: true,
+      };
     }
   }
 
@@ -344,6 +375,53 @@ export function swapStrike(match: Match): Match {
   match.updatedAt = Date.now();
   saveMatch(match);
   return match;
+}
+
+export function retireOut(match: Match): { match: Match; needsNextBatsman: boolean } {
+  const innings = getCurrentInnings(match);
+  const striker = innings.battingOrder[innings.currentBatsmanIndex];
+  
+  striker.isOut = true;
+  striker.dismissalType = 'Retired Out';
+  innings.totalWickets += 1;
+
+  // End current partnership
+  innings.currentPartnership.isActive = false;
+  innings.partnerships.push({ ...innings.currentPartnership });
+
+  // Find next batsman
+  const nextBatIdx = innings.battingOrder.findIndex((b, i) =>
+    i !== innings.currentBatsmanIndex && i !== innings.nonStrikerIndex && !b.isOut
+  );
+
+  let needsNextBatsman = false;
+  if (nextBatIdx >= 0) {
+    innings.currentBatsmanIndex = nextBatIdx;
+    const newBatsman = innings.battingOrder[nextBatIdx];
+    const nonStriker = innings.battingOrder[innings.nonStrikerIndex];
+    innings.currentPartnership = {
+      runs: 0, balls: 0,
+      batsman1Id: newBatsman.playerId, batsman1Name: newBatsman.playerName,
+      batsman2Id: nonStriker.playerId, batsman2Name: nonStriker.playerName,
+      wicketNumber: innings.totalWickets,
+      isActive: true,
+    };
+    needsNextBatsman = true;
+  } else {
+    // All out
+    innings.isCompleted = true;
+    if (match.currentInnings === 0) {
+      match.currentInnings = 1;
+      match.innings[1].target = innings.totalRuns + 1;
+    } else {
+      match.status = 'completed';
+      match.result = calculateResult(match);
+    }
+  }
+
+  match.updatedAt = Date.now();
+  saveMatch(match);
+  return { match, needsNextBatsman };
 }
 
 export function deleteMatch(id: string) {
