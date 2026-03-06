@@ -3,10 +3,11 @@ import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Trophy, Star } from 'lucide-react';
+import { ArrowLeft, Trophy, Star, FileDown } from 'lucide-react';
 import { getMatch, getOversString, getRunRate, saveMatch } from '@/lib/matchStore';
 import { Match } from '@/types/cricket';
 import PlayerOfTheMatch from '@/components/PlayerOfTheMatch';
+import { generateMatchPDF } from '@/lib/pdfGenerator';
 
 export default function Scorecard() {
   const { id } = useParams<{ id: string }>();
@@ -58,6 +59,29 @@ export default function Scorecard() {
     );
   }
 
+  const getPlayerPhoto = (playerId: string): string | undefined => {
+    const allPlayers = [...match.setup.teamA.players, ...match.setup.teamB.players];
+    return allPlayers.find(p => p.id === playerId)?.photoUrl;
+  };
+
+  const getPlayerCaptain = (playerId: string): boolean => {
+    const allPlayers = [...match.setup.teamA.players, ...match.setup.teamB.players];
+    return allPlayers.find(p => p.id === playerId)?.isCaptain || false;
+  };
+
+  const PlayerAvatar = ({ playerId, name }: { playerId: string; name: string }) => {
+    const photo = getPlayerPhoto(playerId);
+    return (
+      <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0 overflow-hidden">
+        {photo ? (
+          <img src={photo} alt={name} className="w-full h-full object-cover" />
+        ) : (
+          name.charAt(0)
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen pb-24">
       {/* Header */}
@@ -82,8 +106,12 @@ export default function Scorecard() {
         {match.playerOfTheMatchName && (
           <Card className="p-4 border-2 border-primary/30 bg-primary/5">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-                <Star className="h-6 w-6 text-primary" />
+              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
+                {match.playerOfTheMatch && getPlayerPhoto(match.playerOfTheMatch) ? (
+                  <img src={getPlayerPhoto(match.playerOfTheMatch)!} alt={match.playerOfTheMatchName} className="w-full h-full object-cover" />
+                ) : (
+                  <Star className="h-6 w-6 text-primary" />
+                )}
               </div>
               <div>
                 <p className="text-xs text-muted-foreground font-medium">🏆 Player of the Match</p>
@@ -98,14 +126,11 @@ export default function Scorecard() {
 
           return (
             <div key={inningsIdx} className="space-y-3 animate-fade-in">
-              {/* Innings Score */}
               <Card className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="font-bold text-base">{innings.teamName}</h2>
-                    <p className="text-xs text-muted-foreground">
-                      {inningsIdx === 0 ? '1st' : '2nd'} Innings
-                    </p>
+                    <p className="text-xs text-muted-foreground">{inningsIdx === 0 ? '1st' : '2nd'} Innings</p>
                   </div>
                   <div className="text-right">
                     <p className="text-3xl font-black">{innings.totalRuns}/{innings.totalWickets}</p>
@@ -141,17 +166,14 @@ export default function Scorecard() {
                             <TableRow key={b.playerId}>
                               <TableCell className="text-xs py-2">
                                 <div className="flex items-center gap-2">
-                                  <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">
-                                    {b.playerName.charAt(0)}
-                                  </div>
+                                  <PlayerAvatar playerId={b.playerId} name={b.playerName} />
                                   <div>
-                                    <span className="font-medium">{b.playerName}</span>
-                                    {b.isOut && (
-                                      <span className="block text-[10px] text-muted-foreground">{b.dismissalType}</span>
-                                    )}
-                                    {!b.isOut && b.balls > 0 && (
-                                      <span className="block text-[10px] text-primary">not out</span>
-                                    )}
+                                    <span className="font-medium">
+                                      {b.playerName}
+                                      {getPlayerCaptain(b.playerId) && <span className="text-primary ml-1">(C)</span>}
+                                    </span>
+                                    {b.isOut && <span className="block text-[10px] text-muted-foreground">{b.dismissalType}</span>}
+                                    {!b.isOut && b.balls > 0 && <span className="block text-[10px] text-primary">not out</span>}
                                   </div>
                                 </div>
                               </TableCell>
@@ -170,7 +192,6 @@ export default function Scorecard() {
                 </CardContent>
               </Card>
 
-              {/* Extras */}
               <div className="px-1 text-xs text-muted-foreground">
                 Extras: {innings.extras.total} (WD: {innings.extras.wides}, NB: {innings.extras.noBalls}, LB: {innings.extras.legByes}, B: {innings.extras.byes})
               </div>
@@ -202,10 +223,11 @@ export default function Scorecard() {
                               <TableRow key={b.playerId}>
                                 <TableCell className="text-xs font-medium py-2">
                                   <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold shrink-0">
-                                      {b.playerName.charAt(0)}
-                                    </div>
-                                    {b.playerName}
+                                    <PlayerAvatar playerId={b.playerId} name={b.playerName} />
+                                    <span>
+                                      {b.playerName}
+                                      {getPlayerCaptain(b.playerId) && <span className="text-primary ml-1">(C)</span>}
+                                    </span>
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-xs text-right py-2">{b.overs}.{b.balls}</TableCell>
@@ -224,16 +246,25 @@ export default function Scorecard() {
           );
         })}
 
-        {/* Select POTM button if not yet selected */}
-        {match.status === 'completed' && !match.playerOfTheMatch && (
-          <Button
-            onClick={() => setShowPOTM(true)}
-            className="w-full h-14 text-lg font-black rounded-xl"
-            size="lg"
-          >
-            🏆 Select Player of the Match
-          </Button>
-        )}
+        {/* Actions */}
+        <div className="space-y-2">
+          {match.status === 'completed' && !match.playerOfTheMatch && (
+            <Button onClick={() => setShowPOTM(true)} className="w-full h-14 text-lg font-black rounded-xl" size="lg">
+              🏆 Select Player of the Match
+            </Button>
+          )}
+
+          {match.status === 'completed' && (
+            <Button
+              onClick={() => generateMatchPDF(match)}
+              variant="outline"
+              className="w-full h-12 font-bold rounded-xl"
+              size="lg"
+            >
+              <FileDown className="h-5 w-5 mr-2" /> Download PDF Scorecard
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
