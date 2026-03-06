@@ -51,6 +51,17 @@ function createInnings(teamName: string, teamId: string, players: Player[], bowl
     wides: 0,
   }));
 
+  const initialPartnership = {
+    runs: 0,
+    balls: 0,
+    batsman1Id: players[0]?.id || '',
+    batsman1Name: players[0]?.name || '',
+    batsman2Id: players[1]?.id || '',
+    batsman2Name: players[1]?.name || '',
+    wicketNumber: 0,
+    isActive: true,
+  };
+
   return {
     teamName,
     teamId,
@@ -68,6 +79,8 @@ function createInnings(teamName: string, teamId: string, players: Player[], bowl
     currentBowlerIndex: 0,
     isCompleted: false,
     target,
+    partnerships: [],
+    currentPartnership: initialPartnership,
   };
 }
 
