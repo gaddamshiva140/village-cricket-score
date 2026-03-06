@@ -76,6 +76,19 @@ export interface InningsData {
   isCompleted: boolean;
   target?: number; // only for 2nd innings
   lastOverBowlerIndex?: number; // track last over's bowler to prevent consecutive overs
+  partnerships: Partnership[];
+  currentPartnership: Partnership;
+}
+
+export interface Partnership {
+  runs: number;
+  balls: number;
+  batsman1Id: string;
+  batsman1Name: string;
+  batsman2Id: string;
+  batsman2Name: string;
+  wicketNumber: number;
+  isActive: boolean;
 }
 
 export interface MatchSetup {
