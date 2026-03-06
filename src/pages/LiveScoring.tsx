@@ -19,9 +19,11 @@ export default function LiveScoring() {
   const [showWicket, setShowWicket] = useState(false);
   const [showBowlerSelect, setShowBowlerSelect] = useState(false);
   const [bowlerSelectRequired, setBowlerSelectRequired] = useState(false);
+  const [showNextBatsman, setShowNextBatsman] = useState(false);
   const [extraType, setExtraType] = useState<'noball' | 'wide' | 'legbye'>('noball');
   const [animation, setAnimation] = useState<'four' | 'six' | 'wicket' | 'fifty' | 'hundred' | null>(null);
   const [overCompleteMessage, setOverCompleteMessage] = useState<string | null>(null);
+  const [pendingWicketDone, setPendingWicketDone] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -40,7 +42,6 @@ export default function LiveScoring() {
     if (!match) return;
     
     const inningsBefore = match.currentInnings;
-    const ballsBefore = getCurrentInnings(match).totalBalls;
     
     const result = recordBall(match, runs, ballType, isWicket, dismissalType);
     if (result.animationType) {
@@ -57,6 +58,21 @@ export default function LiveScoring() {
       return;
     }
 
+    // After wicket, show next batsman selection (if not all out / innings not over)
+    if (isWicket) {
+      const currentInnings = getCurrentInnings(result.match);
+      const availableBatsmen = currentInnings.battingOrder.filter((b, i) =>
+        i !== currentInnings.currentBatsmanIndex && i !== currentInnings.nonStrikerIndex && !b.isOut
+      );
+      if (availableBatsmen.length > 0 && !currentInnings.isCompleted) {
+        setPendingWicketDone(true);
+        setTimeout(() => {
+          setShowNextBatsman(true);
+          setPendingWicketDone(false);
+        }, result.animationType ? 2500 : 500);
+      }
+    }
+
     // Check if innings just switched
     if (result.match.currentInnings === 1 && inningsBefore === 0) {
       setBowlerSelectRequired(true);
@@ -64,7 +80,7 @@ export default function LiveScoring() {
       return;
     }
 
-    // Check if over just completed (ball was legal and totalBalls is now divisible by 6)
+    // Check if over just completed
     const currentInnings = getCurrentInnings(result.match);
     const isLegal = ballType !== 'wide' && ballType !== 'noball';
     if (isLegal && currentInnings.totalBalls > 0 && currentInnings.totalBalls % 6 === 0 && !currentInnings.isCompleted) {
@@ -74,6 +90,16 @@ export default function LiveScoring() {
       setShowBowlerSelect(true);
     }
   }, [match, navigate]);
+
+  const handleSelectNextBatsman = useCallback((batsmanIndex: number) => {
+    if (!match) return;
+    const innings = getCurrentInnings(match);
+    innings.currentBatsmanIndex = batsmanIndex;
+    match.updatedAt = Date.now();
+    saveMatch(match);
+    setMatch({ ...match });
+    setShowNextBatsman(false);
+  }, [match]);
 
   const handleUndo = useCallback(() => {
     if (!match) return;
@@ -91,12 +117,10 @@ export default function LiveScoring() {
     if (!match) return;
     const innings = getCurrentInnings(match);
     
-    // Prevent same bowler bowling consecutive overs
     if (bowlerSelectRequired && innings.lastOverBowlerIndex !== undefined && idx === innings.lastOverBowlerIndex) {
-      return; // Don't allow
+      return;
     }
     
-    // Track last over's bowler
     innings.lastOverBowlerIndex = innings.currentBowlerIndex;
     
     const updated = changeBowler(match, idx);
@@ -112,8 +136,25 @@ export default function LiveScoring() {
   const striker = innings.battingOrder[innings.currentBatsmanIndex];
   const nonStriker = innings.battingOrder[innings.nonStrikerIndex];
   const bowler = innings.bowlingFigures[innings.currentBowlerIndex];
+  const strikerPlayer = innings.players.find(p => p.id === striker?.playerId);
+  const nonStrikerPlayer = innings.players.find(p => p.id === nonStriker?.playerId);
+  // bowler is from other team
+  const bowlingTeamPlayers = match.currentInnings === 0
+    ? (match.setup.battingFirst === 'A' ? match.setup.teamB.players : match.setup.teamA.players)
+    : (match.setup.battingFirst === 'A' ? match.setup.teamA.players : match.setup.teamB.players);
+  const bowlerPlayer = bowlingTeamPlayers.find(p => p.id === bowler?.playerId);
 
   const recentBalls = innings.ballEvents.slice(-6);
+
+  const PlayerAvatar = ({ player, size = 'w-7 h-7', textSize = 'text-xs' }: { player?: { name: string; photoUrl?: string }; size?: string; textSize?: string }) => (
+    <div className={`${size} rounded-full bg-muted flex items-center justify-center ${textSize} font-bold shrink-0 overflow-hidden`}>
+      {player?.photoUrl ? (
+        <img src={player.photoUrl} alt={player.name} className="w-full h-full object-cover" />
+      ) : (
+        <span className="text-muted-foreground">{player?.name?.charAt(0) || '?'}</span>
+      )}
+    </div>
+  );
 
   return (
     <div className="min-h-screen pb-24 bg-background">
@@ -129,7 +170,6 @@ export default function LiveScoring() {
             <span className="text-xs font-medium opacity-70">{match.setup.totalOvers} overs</span>
           </div>
 
-          {/* Scoreboard */}
           <div className="text-center">
             <p className="text-sm font-medium opacity-80">{innings.teamName} Batting</p>
             <div className="flex items-baseline justify-center gap-1 my-1">
@@ -150,7 +190,6 @@ export default function LiveScoring() {
       </div>
 
       <div className="mx-auto max-w-lg px-4 -mt-2 space-y-3">
-        {/* Overs Progress Bar */}
         <Card className="p-3">
           <OversProgress totalBalls={innings.totalBalls} totalOvers={match.setup.totalOvers} />
         </Card>
@@ -160,29 +199,32 @@ export default function LiveScoring() {
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                  {striker?.playerName?.charAt(0) || '?'}
-                </div>
+                <PlayerAvatar player={strikerPlayer} />
                 <span className="font-bold">{striker?.playerName || '-'}</span>
+                {strikerPlayer?.isCaptain && <span className="text-[10px] text-primary font-bold">(C)</span>}
                 <span className="text-xs text-primary font-bold">*</span>
               </div>
               <span className="font-mono font-bold">{striker?.runs} ({striker?.balls})</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
-                  {nonStriker?.playerName?.charAt(0) || '?'}
-                </div>
+                <PlayerAvatar player={nonStrikerPlayer} />
                 <span className="text-muted-foreground">{nonStriker?.playerName || '-'}</span>
+                {nonStrikerPlayer?.isCaptain && <span className="text-[10px] text-primary font-bold">(C)</span>}
               </div>
               <span className="font-mono text-muted-foreground">{nonStriker?.runs} ({nonStriker?.balls})</span>
             </div>
             <div className="border-t pt-2 flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-destructive/20 flex items-center justify-center text-xs font-bold text-destructive">
-                  {bowler?.playerName?.charAt(0) || '?'}
+                <div className="w-7 h-7 rounded-full bg-destructive/20 flex items-center justify-center shrink-0 overflow-hidden">
+                  {bowlerPlayer?.photoUrl ? (
+                    <img src={bowlerPlayer.photoUrl} alt={bowler?.playerName} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-xs font-bold text-destructive">{bowler?.playerName?.charAt(0) || '?'}</span>
+                  )}
                 </div>
                 <span className="text-muted-foreground">{bowler?.playerName || '-'}</span>
+                {bowlerPlayer?.isCaptain && <span className="text-[10px] text-primary font-bold">(C)</span>}
               </div>
               <span className="font-mono text-muted-foreground">
                 {bowler?.overs}.{bowler?.balls}-{bowler?.runs}-{bowler?.wickets}
@@ -198,19 +240,13 @@ export default function LiveScoring() {
             <span
               key={ball.id}
               className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold shrink-0 ${
-                ball.isWicket
-                  ? 'bg-destructive text-destructive-foreground'
-                  : ball.ballType === 'wide'
-                  ? 'bg-muted text-muted-foreground border border-border'
-                  : ball.ballType === 'noball'
-                  ? 'bg-accent text-accent-foreground border border-border'
-                  : ball.runs === 4
-                  ? 'bg-primary/20 text-primary border border-primary/50'
-                  : ball.runs === 6
-                  ? 'bg-accent text-accent-foreground border border-accent'
-                  : ball.runs === 0
-                  ? 'bg-muted text-muted-foreground'
-                  : 'bg-secondary text-secondary-foreground'
+                ball.isWicket ? 'bg-destructive text-destructive-foreground'
+                : ball.ballType === 'wide' ? 'bg-muted text-muted-foreground border border-border'
+                : ball.ballType === 'noball' ? 'bg-accent text-accent-foreground border border-border'
+                : ball.runs === 4 ? 'bg-primary/20 text-primary border border-primary/50'
+                : ball.runs === 6 ? 'bg-accent text-accent-foreground border border-accent'
+                : ball.runs === 0 ? 'bg-muted text-muted-foreground'
+                : 'bg-secondary text-secondary-foreground'
               }`}
             >
               {ball.isWicket ? 'W' : ball.ballType === 'wide' ? `${ball.runs}wd` : ball.ballType === 'noball' ? `${ball.batsmanRuns}nb` : ball.ballType === 'legbye' ? `${ball.runs}lb` : ball.runs}
@@ -221,50 +257,23 @@ export default function LiveScoring() {
         {/* Score Buttons */}
         <div className="grid grid-cols-4 gap-2">
           {[0, 1, 2, 3].map(r => (
-            <Button
-              key={r}
-              variant="outline"
-              className="h-14 text-xl font-black rounded-xl"
-              onClick={() => handleScore(r)}
-            >
+            <Button key={r} variant="outline" className="h-14 text-xl font-black rounded-xl" onClick={() => handleScore(r)}>
               {r}
             </Button>
           ))}
         </div>
 
         <div className="grid grid-cols-3 gap-2">
-          <Button
-            className="h-14 text-xl font-black rounded-xl bg-primary hover:bg-primary/80 text-primary-foreground"
-            onClick={() => handleScore(4)}
-          >
-            4
-          </Button>
-          <Button
-            className="h-14 text-xl font-black rounded-xl bg-accent hover:bg-accent/80 text-accent-foreground"
-            onClick={() => handleScore(6)}
-          >
-            6
-          </Button>
-          <Button
-            variant="destructive"
-            className="h-14 text-base font-black rounded-xl"
-            onClick={() => setShowWicket(true)}
-          >
-            WICKET
-          </Button>
+          <Button className="h-14 text-xl font-black rounded-xl bg-primary hover:bg-primary/80 text-primary-foreground" onClick={() => handleScore(4)}>4</Button>
+          <Button className="h-14 text-xl font-black rounded-xl bg-accent hover:bg-accent/80 text-accent-foreground" onClick={() => handleScore(6)}>6</Button>
+          <Button variant="destructive" className="h-14 text-base font-black rounded-xl" onClick={() => setShowWicket(true)}>WICKET</Button>
         </div>
 
         {/* Extras & Controls */}
         <div className="grid grid-cols-3 gap-2">
-          <Button variant="outline" className="text-xs font-bold rounded-xl h-11" onClick={() => { setExtraType('noball'); setShowExtras(true); }}>
-            No Ball
-          </Button>
-          <Button variant="outline" className="text-xs font-bold rounded-xl h-11" onClick={() => { setExtraType('wide'); setShowExtras(true); }}>
-            Wide
-          </Button>
-          <Button variant="outline" className="text-xs font-bold rounded-xl h-11" onClick={() => { setExtraType('legbye'); setShowExtras(true); }}>
-            Leg Bye
-          </Button>
+          <Button variant="outline" className="text-xs font-bold rounded-xl h-11" onClick={() => { setExtraType('noball'); setShowExtras(true); }}>No Ball</Button>
+          <Button variant="outline" className="text-xs font-bold rounded-xl h-11" onClick={() => { setExtraType('wide'); setShowExtras(true); }}>Wide</Button>
+          <Button variant="outline" className="text-xs font-bold rounded-xl h-11" onClick={() => { setExtraType('legbye'); setShowExtras(true); }}>Leg Bye</Button>
         </div>
 
         <div className="grid grid-cols-3 gap-2">
@@ -279,15 +288,12 @@ export default function LiveScoring() {
           </Button>
         </div>
 
-        {/* First innings score summary */}
         {match.currentInnings === 1 && (
           <Card className="p-3 text-center">
             <p className="text-sm text-muted-foreground">
               {match.innings[0].teamName}: {match.innings[0].totalRuns}/{match.innings[0].totalWickets} ({getOversString(match.innings[0].totalBalls)} ov)
             </p>
-            <p className="text-sm font-bold text-primary">
-              Target: {match.innings[1].target}
-            </p>
+            <p className="text-sm font-bold text-primary">Target: {match.innings[1].target}</p>
           </Card>
         )}
       </div>
@@ -300,15 +306,7 @@ export default function LiveScoring() {
           </DialogHeader>
           <div className="grid grid-cols-4 gap-2">
             {(extraType === 'wide' ? [1, 2, 3, 4] : [0, 1, 2, 3, 4, 6]).map(r => (
-              <Button
-                key={r}
-                variant="outline"
-                className="h-14 text-lg font-bold rounded-xl"
-                onClick={() => {
-                  handleScore(r, extraType);
-                  setShowExtras(false);
-                }}
-              >
+              <Button key={r} variant="outline" className="h-14 text-lg font-bold rounded-xl" onClick={() => { handleScore(r, extraType); setShowExtras(false); }}>
                 +{r}
               </Button>
             ))}
@@ -329,15 +327,7 @@ export default function LiveScoring() {
           </DialogHeader>
           <div className="grid grid-cols-2 gap-2">
             {DISMISSAL_TYPES.map(type => (
-              <Button
-                key={type}
-                variant="outline"
-                className="h-12 text-sm font-bold rounded-xl"
-                onClick={() => {
-                  handleScore(0, 'normal', true, type);
-                  setShowWicket(false);
-                }}
-              >
+              <Button key={type} variant="outline" className="h-12 text-sm font-bold rounded-xl" onClick={() => { handleScore(0, 'normal', true, type); setShowWicket(false); }}>
                 {type}
               </Button>
             ))}
@@ -345,9 +335,52 @@ export default function LiveScoring() {
         </DialogContent>
       </Dialog>
 
+      {/* Next Batsman Dialog */}
+      <Dialog open={showNextBatsman} onOpenChange={(open) => {
+        if (!open) return; // Don't allow closing
+        setShowNextBatsman(open);
+      }}>
+        <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle>
+              <div className="space-y-1">
+                <span className="block text-destructive">Wicket! 🏏</span>
+                <span className="block text-sm font-normal text-muted-foreground">Select next batsman</span>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {innings.battingOrder.map((b, i) => {
+              if (b.isOut || i === innings.nonStrikerIndex || i === innings.currentBatsmanIndex) return null;
+              const player = innings.players.find(p => p.id === b.playerId);
+              return (
+                <Button
+                  key={b.playerId}
+                  variant="outline"
+                  className="w-full justify-start font-medium rounded-xl"
+                  onClick={() => handleSelectNextBatsman(i)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+                      {player?.photoUrl ? (
+                        <img src={player.photoUrl} alt={b.playerName} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-xs font-bold">{b.playerName.charAt(0)}</span>
+                      )}
+                    </div>
+                    <span>{b.playerName}</span>
+                    {player?.isCaptain && <span className="text-[10px] text-primary font-bold">(C)</span>}
+                  </div>
+                </Button>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Bowler Select Dialog */}
       <Dialog open={showBowlerSelect} onOpenChange={(open) => {
-        if (!open && bowlerSelectRequired) return; // Don't allow closing if required
+        if (!open && bowlerSelectRequired) return;
         setShowBowlerSelect(open);
       }}>
         <DialogContent className="max-w-sm" onPointerDownOutside={bowlerSelectRequired ? (e) => e.preventDefault() : undefined}>
@@ -364,6 +397,7 @@ export default function LiveScoring() {
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {innings.bowlingFigures.map((b, i) => {
               const isLastOverBowler = bowlerSelectRequired && innings.lastOverBowlerIndex !== undefined && i === innings.lastOverBowlerIndex;
+              const bPlayer = bowlingTeamPlayers.find(p => p.id === b.playerId);
               return (
                 <Button
                   key={b.playerId}
@@ -373,10 +407,15 @@ export default function LiveScoring() {
                   disabled={isLastOverBowler}
                 >
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-bold shrink-0">
-                      {b.playerName.charAt(0)}
+                    <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden">
+                      {bPlayer?.photoUrl ? (
+                        <img src={bPlayer.photoUrl} alt={b.playerName} className="w-full h-full object-cover" />
+                      ) : (
+                        b.playerName.charAt(0)
+                      )}
                     </div>
                     <span>{b.playerName}</span>
+                    {bPlayer?.isCaptain && <span className="text-[10px] text-primary font-bold">(C)</span>}
                     {isLastOverBowler && <span className="text-[10px] text-muted-foreground">(bowled last over)</span>}
                   </div>
                   <span className="font-mono text-xs">{b.overs}.{b.balls}-{b.runs}-{b.wickets}</span>
