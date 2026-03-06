@@ -204,6 +204,10 @@ export function recordBall(
   if (ballType === 'bye') innings.extras.byes += runs;
   innings.extras.total += extras;
 
+  // Update partnership
+  innings.currentPartnership.runs += totalRunsForBall;
+  innings.currentPartnership.balls += isLegal ? 1 : 0;
+
   // Determine animation
   let animationType: 'four' | 'six' | 'wicket' | 'fifty' | 'hundred' | undefined;
   if (isWicket) animationType = 'wicket';
