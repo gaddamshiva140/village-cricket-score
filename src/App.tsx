@@ -28,6 +28,7 @@ const App = () => (
             <Route path="/score/:id" element={<LiveScoring />} />
             <Route path="/scorecard/:id" element={<Scorecard />} />
             <Route path="/history" element={<MatchHistory />} />
+            <Route path="/teams" element={<Teams />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <BottomNav />
