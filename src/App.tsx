@@ -11,6 +11,7 @@ import LiveScoring from "./pages/LiveScoring";
 import Scorecard from "./pages/Scorecard";
 import MatchHistory from "./pages/MatchHistory";
 import Teams from "./pages/Teams";
+import Players from "./pages/Players";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
