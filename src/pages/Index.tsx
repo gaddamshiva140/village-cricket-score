@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { PlusCircle, Clock, Trophy } from 'lucide-react';
+import { PlusCircle, Clock, Trophy, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getAllMatches, getActiveMatchId } from '@/lib/matchStore';
 import { getOversString } from '@/lib/matchStore';
