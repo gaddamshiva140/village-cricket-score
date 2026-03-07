@@ -30,6 +30,7 @@ const App = () => (
             <Route path="/scorecard/:id" element={<Scorecard />} />
             <Route path="/history" element={<MatchHistory />} />
             <Route path="/teams" element={<Teams />} />
+            <Route path="/players" element={<Players />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <BottomNav />

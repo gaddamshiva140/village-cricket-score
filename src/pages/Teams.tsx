@@ -1,10 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Plus, Trash2, Users, Crown, Camera, Pencil, Check } from 'lucide-react';
-import { getAllTeams, saveTeam, deleteTeam, getNextTeamNumber, createDefaultPlayers, SavedTeam } from '@/lib/teamStore';
+import { ArrowLeft, Plus, Trash2, Users, Crown, Pencil, User, Check, X } from 'lucide-react';
+import { getAllTeams, saveTeam, deleteTeam, getNextTeamNumber, SavedTeam } from '@/lib/teamStore';
+import { getAllPlayers, SavedPlayer } from '@/lib/playerStore';
 import { Player } from '@/types/cricket';
 import {
   Dialog,
@@ -12,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Link } from 'react-router-dom';
 
 export default function Teams() {
   const navigate = useNavigate();
@@ -19,33 +21,32 @@ export default function Teams() {
   const [showCreate, setShowCreate] = useState(false);
   const [editTeam, setEditTeam] = useState<SavedTeam | null>(null);
   const [teamName, setTeamName] = useState('');
-  const [players, setPlayers] = useState<Player[]>(createDefaultPlayers());
-  const [editingIdx, setEditingIdx] = useState<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [pendingPhotoIndex, setPendingPhotoIndex] = useState(-1);
+  const [selectedPlayers, setSelectedPlayers] = useState<Player[]>([]);
+  const [showPlayerPicker, setShowPlayerPicker] = useState(false);
 
+  const allPlayers = getAllPlayers();
   const refresh = () => setTeams(getAllTeams());
 
   const openCreate = () => {
-    const num = getNextTeamNumber();
-    setTeamName(`Team ${num}`);
-    setPlayers(createDefaultPlayers());
+    setTeamName(`Team ${getNextTeamNumber()}`);
+    setSelectedPlayers([]);
     setEditTeam(null);
     setShowCreate(true);
   };
 
   const openEdit = (team: SavedTeam) => {
     setTeamName(team.name);
-    setPlayers([...team.players]);
+    setSelectedPlayers([...team.players]);
     setEditTeam(team);
     setShowCreate(true);
   };
 
   const handleSave = () => {
+    if (selectedPlayers.length < 2) return;
     const team: SavedTeam = {
       id: editTeam?.id || crypto.randomUUID(),
       name: teamName.trim() || `Team ${getNextTeamNumber()}`,
-      players,
+      players: selectedPlayers,
       createdAt: editTeam?.createdAt || Date.now(),
     };
     saveTeam(team);
@@ -58,35 +59,32 @@ export default function Teams() {
     refresh();
   };
 
-  const updatePlayerName = (index: number, name: string) => {
-    setPlayers(players.map((p, i) => (i === index ? { ...p, name } : p)));
+  const toggleCaptain = (playerId: string) => {
+    setSelectedPlayers(selectedPlayers.map(p => ({
+      ...p,
+      isCaptain: p.id === playerId ? !p.isCaptain : false,
+    })));
   };
 
-  const toggleCaptain = (index: number) => {
-    setPlayers(players.map((p, i) => ({ ...p, isCaptain: i === index ? !p.isCaptain : false })));
+  const removePlayer = (playerId: string) => {
+    setSelectedPlayers(selectedPlayers.filter(p => p.id !== playerId));
   };
 
-  const handlePhotoClick = (index: number) => {
-    setPendingPhotoIndex(index);
-    fileInputRef.current?.click();
+  const addPlayerFromPool = (player: SavedPlayer) => {
+    if (selectedPlayers.find(p => p.id === player.id)) return;
+    setSelectedPlayers([...selectedPlayers, {
+      id: player.id,
+      name: player.name,
+      role: player.role,
+      photoUrl: player.photoUrl,
+      isCaptain: false,
+    }]);
   };
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const dataUrl = reader.result as string;
-      setPlayers(players.map((p, i) => (i === pendingPhotoIndex ? { ...p, photoUrl: dataUrl } : p)));
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  };
+  const availablePlayers = allPlayers.filter(p => !selectedPlayers.find(sp => sp.id === p.id));
 
   return (
     <div className="min-h-screen pb-24">
-      <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoChange} />
-
       <div className="cricket-gradient px-4 pb-6 pt-12 text-primary-foreground">
         <div className="mx-auto max-w-lg">
           <button onClick={() => navigate('/')} className="mb-3 flex items-center gap-1 text-sm opacity-80 hover:opacity-100">
@@ -103,7 +101,21 @@ export default function Teams() {
           <Plus className="h-5 w-5" /> Create New Team
         </Button>
 
-        {teams.length === 0 && (
+        {allPlayers.length === 0 && (
+          <Card className="border-dashed border-2">
+            <CardContent className="py-6 text-center space-y-3">
+              <User className="h-10 w-10 mx-auto text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Create player profiles first before building teams.</p>
+              <Link to="/players">
+                <Button className="rounded-xl font-bold gap-2">
+                  <Plus className="h-4 w-4" /> Add Players
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+
+        {teams.length === 0 && allPlayers.length > 0 && (
           <div className="text-center py-12">
             <span className="text-5xl block mb-3">👥</span>
             <p className="text-muted-foreground">No teams yet. Create your first team!</p>
@@ -128,8 +140,9 @@ export default function Teams() {
             </CardHeader>
             <CardContent className="pt-0">
               <div className="flex flex-wrap gap-1">
-                {team.players.map((p, i) => (
-                  <span key={p.id} className="text-xs bg-muted px-2 py-1 rounded-full">
+                {team.players.map(p => (
+                  <span key={p.id} className="text-xs bg-muted px-2 py-1 rounded-full flex items-center gap-1">
+                    {p.photoUrl && <img src={p.photoUrl} className="w-4 h-4 rounded-full object-cover" />}
                     {p.name}{p.isCaptain ? ' (C)' : ''}
                   </span>
                 ))}
@@ -146,61 +159,105 @@ export default function Teams() {
             <DialogTitle>{editTeam ? 'Edit Team' : 'Create Team'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <Input
+              value={teamName}
+              onChange={e => setTeamName(e.target.value)}
+              placeholder="Team Name"
+              className="text-lg font-bold h-12"
+            />
+
+            {/* Selected Players */}
             <div>
-              <Input
-                value={teamName}
-                onChange={e => setTeamName(e.target.value)}
-                placeholder="Team Name"
-                className="text-lg font-bold h-12"
-              />
-            </div>
-            <div className="space-y-2">
-              {players.map((p, i) => (
-                <div key={p.id} className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
-                  <button
-                    onClick={() => handlePhotoClick(i)}
-                    className="relative w-9 h-9 rounded-full bg-secondary flex items-center justify-center shrink-0 overflow-hidden border-2 border-border hover:border-primary transition-colors"
-                  >
-                    {p.photoUrl ? (
-                      <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <Camera className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </button>
-                  <span className="text-xs font-bold text-muted-foreground w-5">{i + 1}</span>
-                  {editingIdx === i ? (
-                    <Input
-                      value={p.name}
-                      onChange={e => updatePlayerName(i, e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && setEditingIdx(null)}
-                      className="flex-1 h-8 text-sm"
-                      autoFocus
-                    />
-                  ) : (
+              <p className="text-sm font-medium mb-2">Team Players ({selectedPlayers.length})</p>
+              {selectedPlayers.length === 0 && (
+                <p className="text-xs text-muted-foreground py-3 text-center">No players added yet. Add from below.</p>
+              )}
+              <div className="space-y-1">
+                {selectedPlayers.map((p, i) => (
+                  <div key={p.id} className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
+                    <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0 overflow-hidden border border-border">
+                      {p.photoUrl ? (
+                        <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <User className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </div>
+                    <span className="text-xs font-bold text-muted-foreground w-5">{i + 1}</span>
                     <span className="flex-1 text-sm font-medium truncate">
                       {p.name}
+                      {p.role && <span className="text-xs text-muted-foreground ml-1">({p.role})</span>}
                       {p.isCaptain && <span className="text-primary ml-1 text-xs font-bold">(C)</span>}
                     </span>
-                  )}
-                  <button
-                    onClick={() => setEditingIdx(editingIdx === i ? null : i)}
-                    className="p-1 rounded text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    {editingIdx === i ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
-                  </button>
-                  <button
-                    onClick={() => toggleCaptain(i)}
-                    className={`p-1 rounded transition-colors ${p.isCaptain ? 'text-primary' : 'text-muted-foreground hover:text-primary/60'}`}
-                  >
-                    <Crown className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
+                    <button onClick={() => toggleCaptain(p.id)} className={`p-1 rounded transition-colors ${p.isCaptain ? 'text-primary' : 'text-muted-foreground hover:text-primary/60'}`}>
+                      <Crown className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => removePlayer(p.id)} className="p-1 rounded text-destructive/60 hover:text-destructive transition-colors">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">📷 Add photo • ✏️ Edit name • 👑 Set captain</p>
-            <Button onClick={handleSave} className="w-full h-12 text-base font-bold rounded-xl">
+
+            {/* Add Players */}
+            <div>
+              <Button variant="outline" className="w-full rounded-xl gap-2" onClick={() => setShowPlayerPicker(true)}>
+                <Plus className="h-4 w-4" /> Add Players from Pool
+              </Button>
+            </div>
+
+            {selectedPlayers.length < 2 && (
+              <p className="text-xs text-destructive text-center">Minimum 2 players required</p>
+            )}
+
+            <Button onClick={handleSave} disabled={selectedPlayers.length < 2} className="w-full h-12 text-base font-bold rounded-xl">
               {editTeam ? 'Update Team' : 'Save Team'}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Player Picker Dialog */}
+      <Dialog open={showPlayerPicker} onOpenChange={setShowPlayerPicker}>
+        <DialogContent className="max-w-sm max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Select Players</DialogTitle>
+          </DialogHeader>
+          {availablePlayers.length === 0 && (
+            <div className="text-center py-6 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                {allPlayers.length === 0 ? 'No player profiles found.' : 'All players are already in the team.'}
+              </p>
+              {allPlayers.length === 0 && (
+                <Link to="/players">
+                  <Button className="rounded-xl font-bold gap-2">
+                    <Plus className="h-4 w-4" /> Create Players
+                  </Button>
+                </Link>
+              )}
+            </div>
+          )}
+          <div className="space-y-1">
+            {availablePlayers.map(p => (
+              <button
+                key={p.id}
+                onClick={() => addPlayerFromPool(p)}
+                className="w-full flex items-center gap-3 p-3 rounded-xl border border-border hover:border-primary/50 hover:bg-accent transition-all text-left"
+              >
+                <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center shrink-0 overflow-hidden border border-border">
+                  {p.photoUrl ? (
+                    <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm">{p.name}</p>
+                  {p.role && <p className="text-xs text-muted-foreground">{p.role}</p>}
+                </div>
+                <Plus className="h-4 w-4 text-muted-foreground" />
+              </button>
+            ))}
           </div>
         </DialogContent>
       </Dialog>
