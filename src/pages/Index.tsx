@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { PlusCircle, Clock, Trophy, Users } from 'lucide-react';
+import { PlusCircle, Clock, Trophy, Users, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getAllMatches, getActiveMatchId } from '@/lib/matchStore';
 import { getOversString } from '@/lib/matchStore';
@@ -54,11 +54,17 @@ export default function Home() {
         )}
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <Link to="/create">
             <Button className="w-full h-20 flex-col gap-2 rounded-xl text-sm font-bold" size="lg">
               <PlusCircle className="h-6 w-6" />
               New Match
+            </Button>
+          </Link>
+          <Link to="/players">
+            <Button variant="outline" className="w-full h-20 flex-col gap-2 rounded-xl text-sm font-bold" size="lg">
+              <User className="h-6 w-6" />
+              Players
             </Button>
           </Link>
           <Link to="/teams">

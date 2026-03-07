@@ -39,11 +39,3 @@ export function getNextTeamNumber(): number {
   });
   return max + 1;
 }
-
-export function createDefaultPlayers(): Player[] {
-  return Array.from({ length: 11 }, (_, i) => ({
-    id: crypto.randomUUID(),
-    name: `Player ${i + 1}`,
-    isCaptain: false,
-  }));
-}

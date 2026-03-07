@@ -11,6 +11,7 @@ import LiveScoring from "./pages/LiveScoring";
 import Scorecard from "./pages/Scorecard";
 import MatchHistory from "./pages/MatchHistory";
 import Teams from "./pages/Teams";
+import Players from "./pages/Players";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/scorecard/:id" element={<Scorecard />} />
             <Route path="/history" element={<MatchHistory />} />
             <Route path="/teams" element={<Teams />} />
+            <Route path="/players" element={<Players />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <BottomNav />
