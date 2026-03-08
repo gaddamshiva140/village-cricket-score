@@ -25,6 +25,10 @@ export default function LiveScoring() {
   const [animation, setAnimation] = useState<'four' | 'six' | 'wicket' | 'fifty' | 'hundred' | null>(null);
   const [overCompleteMessage, setOverCompleteMessage] = useState<string | null>(null);
   const [pendingWicketDone, setPendingWicketDone] = useState(false);
+  const [showInningsSetup, setShowInningsSetup] = useState(false);
+  const [setupStrikerId, setSetupStrikerId] = useState<string>('');
+  const [setupNonStrikerId, setSetupNonStrikerId] = useState<string>('');
+  const [setupBowlerId, setSetupBowlerId] = useState<string>('');
 
   useEffect(() => {
     if (id) {
@@ -35,6 +39,11 @@ export default function LiveScoring() {
           return;
         }
         setMatch(m);
+        // Show initial setup if no balls bowled yet in current innings
+        const currentInnings = m.innings[m.currentInnings];
+        if (currentInnings.totalBalls === 0) {
+          setShowInningsSetup(true);
+        }
       }
     }
   }, [id, navigate]);
