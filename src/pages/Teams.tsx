@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Plus, Trash2, Users, Crown, Pencil, User, X } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Users, Crown, Pencil, User, X, Camera } from 'lucide-react';
 import { getAllTeams, saveTeam, deleteTeam, getNextTeamNumber, SavedTeam } from '@/lib/teamStore';
 import { getAllPlayers, SavedPlayer } from '@/lib/playerStore';
 import { Player } from '@/types/cricket';
