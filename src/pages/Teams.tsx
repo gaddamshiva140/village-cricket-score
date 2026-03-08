@@ -187,6 +187,21 @@ export default function Teams() {
             <DialogTitle>{editTeam ? 'Edit Team' : 'Create Team'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Team Logo */}
+            <div className="flex justify-center">
+              <button
+                onClick={() => logoFileRef.current?.click()}
+                className="w-20 h-20 rounded-full bg-muted flex items-center justify-center overflow-hidden border-2 border-dashed border-border hover:border-primary transition-colors"
+              >
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                ) : (
+                  <Camera className="h-8 w-8 text-muted-foreground" />
+                )}
+              </button>
+            </div>
+            <p className="text-xs text-center text-muted-foreground">Tap to add team logo (camera or gallery)</p>
+
             <Input
               value={teamName}
               onChange={e => setTeamName(e.target.value)}
