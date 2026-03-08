@@ -102,6 +102,16 @@ export function generateMatchPDF(match: Match) {
 
     yPos = (doc as any).lastAutoTable.finalY + 2;
 
+    // Did Not Bat
+    const dnb = innings.battingOrder.filter(b => b.balls === 0 && !b.isOut);
+    if (dnb.length > 0) {
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'italic');
+      doc.text(`Did not bat: ${dnb.map(b => b.playerName).join(', ')}`, 14, yPos + 4);
+      doc.setFont('helvetica', 'normal');
+      yPos += 6;
+    }
+
     // Extras
     doc.setFontSize(8);
     doc.text(`Extras: ${innings.extras.total} (WD: ${innings.extras.wides}, NB: ${innings.extras.noBalls}, LB: ${innings.extras.legByes}, B: ${innings.extras.byes})`, 14, yPos + 4);
