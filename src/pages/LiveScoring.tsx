@@ -82,8 +82,7 @@ export default function LiveScoring() {
     }
 
     if (result.match.currentInnings === 1 && inningsBefore === 0) {
-      setBowlerSelectRequired(true);
-      setShowBowlerSelect(true);
+      setShowInningsSetup(true);
       return;
     }
 
