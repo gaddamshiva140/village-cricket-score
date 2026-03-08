@@ -69,20 +69,27 @@ export default function Players() {
     refresh();
   };
 
-  const handlePhoto = () => fileRef.current?.click();
+  const handlePhoto = () => {
+    // Reset input value before clicking to ensure onChange fires even for same file
+    if (fileRef.current) {
+      fileRef.current.value = '';
+      fileRef.current.click();
+    }
+  };
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onloadend = () => setPhotoUrl(reader.result as string);
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      setPhotoUrl(result);
+    };
     reader.readAsDataURL(file);
-    e.target.value = '';
   };
 
   return (
     <div className="min-h-screen pb-24">
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
 
       <div className="cricket-gradient px-4 pb-6 pt-12 text-primary-foreground">
         <div className="mx-auto max-w-lg">
