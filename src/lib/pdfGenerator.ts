@@ -102,6 +102,16 @@ export function generateMatchPDF(match: Match) {
 
     yPos = (doc as any).lastAutoTable.finalY + 2;
 
+    // Did Not Bat
+    const dnb = innings.battingOrder.filter(b => b.balls === 0 && !b.isOut);
+    if (dnb.length > 0) {
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'italic');
+      doc.text(`Did not bat: ${dnb.map(b => b.playerName).join(', ')}`, 14, yPos + 4);
+      doc.setFont('helvetica', 'normal');
+      yPos += 6;
+    }
+
     // Extras
     doc.setFontSize(8);
     doc.text(`Extras: ${innings.extras.total} (WD: ${innings.extras.wides}, NB: ${innings.extras.noBalls}, LB: ${innings.extras.legByes}, B: ${innings.extras.byes})`, 14, yPos + 4);
@@ -147,39 +157,6 @@ export function generateMatchPDF(match: Match) {
     }
   });
 
-  // Player Runs Bar Chart Summary (text-based)
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Player Runs Summary', 14, yPos);
-  yPos += 5;
-
-  const allBatsmen = match.innings.flatMap(inn =>
-    inn.battingOrder.filter(b => b.balls > 0 || b.isOut).map(b => ({ name: b.playerName, runs: b.runs }))
-  );
-
-  if (allBatsmen.length > 0) {
-    const maxRuns = Math.max(...allBatsmen.map(b => b.runs));
-    const barMaxWidth = 100;
-
-    allBatsmen.forEach(b => {
-      if (yPos > 270) {
-        doc.addPage();
-        yPos = 20;
-      }
-      doc.setFontSize(8);
-      doc.setFont('helvetica', 'normal');
-      doc.text(b.name, 14, yPos + 3);
-      const barWidth = maxRuns > 0 ? (b.runs / maxRuns) * barMaxWidth : 0;
-      doc.setFillColor(34, 87, 50);
-      doc.rect(55, yPos - 1, barWidth, 4, 'F');
-      doc.setFont('helvetica', 'bold');
-      doc.text(String(b.runs), 55 + barWidth + 3, yPos + 3);
-      yPos += 7;
-    });
-  }
-
-  yPos += 5;
-
   // Player of the Match with photo
   if (match.playerOfTheMatchName) {
     if (yPos > 240) {
@@ -206,13 +183,9 @@ export function generateMatchPDF(match: Match) {
       }
     }
 
-    doc.setFontSize(16);
+    doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text(match.playerOfTheMatchName, pageWidth / 2, yPos, { align: 'center' });
-    yPos += 6;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.text('🏆 Player of the Match', pageWidth / 2, yPos, { align: 'center' });
+    doc.text(`Player of the Match: ${match.playerOfTheMatchName}`, pageWidth / 2, yPos, { align: 'center' });
   }
 
   // Footer

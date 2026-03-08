@@ -116,7 +116,7 @@ export default function Scorecard() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground font-medium">🏆 Player of the Match</p>
-                <p className="font-black text-lg">{match.playerOfTheMatchName}</p>
+                <p className="font-black text-lg">Player of the Match: {match.playerOfTheMatchName}</p>
               </div>
             </div>
           </Card>
@@ -196,6 +196,23 @@ export default function Scorecard() {
                               </TableCell>
                             </TableRow>
                           ))}
+                        {/* Did Not Bat */}
+                        {(() => {
+                          const dnb = innings.battingOrder.filter(b => b.balls === 0 && !b.isOut);
+                          if (dnb.length === 0) return null;
+                          return (
+                            <TableRow>
+                              <TableCell colSpan={6} className="text-xs py-2 text-muted-foreground">
+                                <span className="font-medium">Did not bat: </span>
+                                {dnb.map((b, i) => (
+                                  <span key={b.playerId}>
+                                    {b.playerName}{getPlayerCaptain(b.playerId) ? ' (C)' : ''}{i < dnb.length - 1 ? ', ' : ''}
+                                  </span>
+                                ))}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })()}
                       </TableBody>
                     </Table>
                   </div>
