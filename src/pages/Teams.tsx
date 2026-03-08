@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Plus, Trash2, Users, Crown, Pencil, User, X } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Users, Crown, Pencil, User, X, Camera } from 'lucide-react';
 import { getAllTeams, saveTeam, deleteTeam, getNextTeamNumber, SavedTeam } from '@/lib/teamStore';
 import { getAllPlayers, SavedPlayer } from '@/lib/playerStore';
 import { Player } from '@/types/cricket';
@@ -23,6 +23,8 @@ export default function Teams() {
   const [teamName, setTeamName] = useState('');
   const [selectedPlayers, setSelectedPlayers] = useState<Player[]>([]);
   const [showPlayerPicker, setShowPlayerPicker] = useState(false);
+  const [logoUrl, setLogoUrl] = useState('');
+  const logoFileRef = useRef<HTMLInputElement>(null);
 
   const allPlayers = getAllPlayers();
   const refresh = () => setTeams(getAllTeams());
@@ -31,6 +33,7 @@ export default function Teams() {
     setTeamName(`Team ${getNextTeamNumber()}`);
     setSelectedPlayers([]);
     setEditTeam(null);
+    setLogoUrl('');
     setShowCreate(true);
   };
 
@@ -38,6 +41,7 @@ export default function Teams() {
     setTeamName(team.name);
     setSelectedPlayers([...team.players]);
     setEditTeam(team);
+    setLogoUrl(team.logoUrl || '');
     setShowCreate(true);
   };
 
@@ -47,6 +51,7 @@ export default function Teams() {
       id: editTeam?.id || crypto.randomUUID(),
       name: teamName.trim() || `Team ${getNextTeamNumber()}`,
       players: selectedPlayers,
+      logoUrl: logoUrl || undefined,
       createdAt: editTeam?.createdAt || Date.now(),
     };
     saveTeam(team);
@@ -83,8 +88,18 @@ export default function Teams() {
 
   const availablePlayers = allPlayers.filter(p => !selectedPlayers.find(sp => sp.id === p.id));
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setLogoUrl(reader.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
   return (
     <div className="min-h-screen pb-24">
+      <input ref={logoFileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
       <div className="cricket-gradient px-4 pb-6 pt-12 text-primary-foreground">
         <div className="mx-auto max-w-lg">
           <button onClick={() => navigate('/')} className="mb-3 flex items-center gap-1 text-sm opacity-80 hover:opacity-100">
@@ -128,7 +143,12 @@ export default function Teams() {
             <Card key={team.id} className="overflow-hidden">
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
-                  🏏 {team.name}
+                  {team.logoUrl ? (
+                    <img src={team.logoUrl} alt={team.name} className="w-8 h-8 rounded-full object-cover border border-border" />
+                  ) : (
+                    <span>🏏</span>
+                  )}
+                  {team.name}
                   <span className="text-xs font-normal text-muted-foreground">({team.players.length} players)</span>
                 </CardTitle>
                 <div className="flex gap-1">
@@ -167,6 +187,21 @@ export default function Teams() {
             <DialogTitle>{editTeam ? 'Edit Team' : 'Create Team'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Team Logo */}
+            <div className="flex justify-center">
+              <button
+                onClick={() => logoFileRef.current?.click()}
+                className="w-20 h-20 rounded-full bg-muted flex items-center justify-center overflow-hidden border-2 border-dashed border-border hover:border-primary transition-colors"
+              >
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                ) : (
+                  <Camera className="h-8 w-8 text-muted-foreground" />
+                )}
+              </button>
+            </div>
+            <p className="text-xs text-center text-muted-foreground">Tap to add team logo (camera or gallery)</p>
+
             <Input
               value={teamName}
               onChange={e => setTeamName(e.target.value)}
