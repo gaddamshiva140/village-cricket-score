@@ -6,6 +6,7 @@ export interface SavedTeam {
   id: string;
   name: string;
   players: Player[];
+  logoUrl?: string; // base64 data URL
   createdAt: number;
 }
 
