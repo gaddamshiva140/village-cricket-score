@@ -82,7 +82,7 @@ export default function Players() {
 
   return (
     <div className="min-h-screen pb-24">
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoChange} />
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
 
       <div className="cricket-gradient px-4 pb-6 pt-12 text-primary-foreground">
         <div className="mx-auto max-w-lg">

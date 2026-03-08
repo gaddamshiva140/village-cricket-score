@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Plus, Trash2, Users, Crown, Pencil, User, Check, X } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Users, Crown, Pencil, User, X } from 'lucide-react';
 import { getAllTeams, saveTeam, deleteTeam, getNextTeamNumber, SavedTeam } from '@/lib/teamStore';
 import { getAllPlayers, SavedPlayer } from '@/lib/playerStore';
 import { Player } from '@/types/cricket';
@@ -122,34 +122,42 @@ export default function Teams() {
           </div>
         )}
 
-        {teams.map(team => (
-          <Card key={team.id} className="overflow-hidden">
-            <CardHeader className="pb-2 flex flex-row items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                🏏 {team.name}
-                <span className="text-xs font-normal text-muted-foreground">({team.players.length} players)</span>
-              </CardTitle>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(team)}>
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(team.id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="flex flex-wrap gap-1">
-                {team.players.map(p => (
-                  <span key={p.id} className="text-xs bg-muted px-2 py-1 rounded-full flex items-center gap-1">
-                    {p.photoUrl && <img src={p.photoUrl} className="w-4 h-4 rounded-full object-cover" />}
-                    {p.name}{p.isCaptain ? ' (C)' : ''}
-                  </span>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+        {teams.map(team => {
+          const captain = team.players.find(p => p.isCaptain);
+          return (
+            <Card key={team.id} className="overflow-hidden">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  🏏 {team.name}
+                  <span className="text-xs font-normal text-muted-foreground">({team.players.length} players)</span>
+                </CardTitle>
+                <div className="flex gap-1">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(team)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(team.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {captain && (
+                  <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                    <Crown className="h-3 w-3 text-secondary" /> Captain: <span className="font-bold text-foreground">{captain.name}</span>
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-1">
+                  {team.players.map(p => (
+                    <span key={p.id} className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 ${p.isCaptain ? 'bg-secondary/20 border border-secondary/50 font-bold' : 'bg-muted'}`}>
+                      {p.photoUrl && <img src={p.photoUrl} className="w-4 h-4 rounded-full object-cover" />}
+                      {p.name}{p.isCaptain ? ' (C)' : ''}
+                    </span>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Create/Edit Team Dialog */}
@@ -166,16 +174,27 @@ export default function Teams() {
               className="text-lg font-bold h-12"
             />
 
-            {/* Selected Players */}
+            {/* Selected Players - tap to make captain */}
             <div>
-              <p className="text-sm font-medium mb-2">Team Players ({selectedPlayers.length})</p>
+              <p className="text-sm font-medium mb-1">Team Players ({selectedPlayers.length})</p>
+              <p className="text-xs text-muted-foreground mb-2">Tap a player card to make them captain</p>
               {selectedPlayers.length === 0 && (
                 <p className="text-xs text-muted-foreground py-3 text-center">No players added yet. Add from below.</p>
               )}
               <div className="space-y-1">
                 {selectedPlayers.map((p, i) => (
-                  <div key={p.id} className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
-                    <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center shrink-0 overflow-hidden border border-border">
+                  <div
+                    key={p.id}
+                    onClick={() => toggleCaptain(p.id)}
+                    className={`flex items-center gap-2 rounded-lg px-3 py-2 cursor-pointer transition-all ${
+                      p.isCaptain
+                        ? 'bg-secondary/15 border-2 border-secondary shadow-sm'
+                        : 'bg-muted border-2 border-transparent hover:border-secondary/30'
+                    }`}
+                  >
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${
+                      p.isCaptain ? 'ring-2 ring-secondary ring-offset-1' : 'border border-border'
+                    } bg-secondary/10`}>
                       {p.photoUrl ? (
                         <img src={p.photoUrl} alt={p.name} className="w-full h-full object-cover" />
                       ) : (
@@ -186,12 +205,16 @@ export default function Teams() {
                     <span className="flex-1 text-sm font-medium truncate">
                       {p.name}
                       {p.role && <span className="text-xs text-muted-foreground ml-1">({p.role})</span>}
-                      {p.isCaptain && <span className="text-primary ml-1 text-xs font-bold">(C)</span>}
                     </span>
-                    <button onClick={() => toggleCaptain(p.id)} className={`p-1 rounded transition-colors ${p.isCaptain ? 'text-primary' : 'text-muted-foreground hover:text-primary/60'}`}>
-                      <Crown className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => removePlayer(p.id)} className="p-1 rounded text-destructive/60 hover:text-destructive transition-colors">
+                    {p.isCaptain && (
+                      <span className="flex items-center gap-1 text-xs font-bold text-secondary">
+                        <Crown className="h-4 w-4" /> Captain
+                      </span>
+                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); removePlayer(p.id); }}
+                      className="p-1 rounded text-destructive/60 hover:text-destructive transition-colors"
+                    >
                       <X className="h-4 w-4" />
                     </button>
                   </div>

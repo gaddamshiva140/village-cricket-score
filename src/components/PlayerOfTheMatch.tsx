@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Star } from 'lucide-react';
 import { Match } from '@/types/cricket';
 import { saveMatch } from '@/lib/matchStore';
 
@@ -16,6 +15,7 @@ interface PlayerStat {
   runs: number;
   balls: number;
   wickets: number;
+  photoUrl?: string;
 }
 
 function getImpactScore(p: PlayerStat) {
@@ -27,14 +27,15 @@ export default function PlayerOfTheMatch({ match, onComplete }: PlayerOfTheMatch
   const [bestPlayer, setBestPlayer] = useState<PlayerStat | null>(null);
 
   useEffect(() => {
-    // Gather all players with their combined stats
     const players: PlayerStat[] = [];
+    const allMatchPlayers = [...match.setup.teamA.players, ...match.setup.teamB.players];
 
     match.innings.forEach((innings) => {
       innings.battingOrder
         .filter(b => b.balls > 0 || b.isOut)
         .forEach(b => {
           const existing = players.find(p => p.playerId === b.playerId);
+          const playerInfo = allMatchPlayers.find(p => p.id === b.playerId);
           if (existing) {
             existing.runs += b.runs;
             existing.balls += b.balls;
@@ -46,6 +47,7 @@ export default function PlayerOfTheMatch({ match, onComplete }: PlayerOfTheMatch
               runs: b.runs,
               balls: b.balls,
               wickets: 0,
+              photoUrl: playerInfo?.photoUrl,
             });
           }
         });
@@ -54,6 +56,7 @@ export default function PlayerOfTheMatch({ match, onComplete }: PlayerOfTheMatch
         .filter(b => b.overs > 0 || b.balls > 0)
         .forEach(b => {
           const existing = players.find(p => p.playerId === b.playerId);
+          const playerInfo = allMatchPlayers.find(p => p.id === b.playerId);
           if (existing) {
             existing.wickets += b.wickets;
           } else {
@@ -64,12 +67,12 @@ export default function PlayerOfTheMatch({ match, onComplete }: PlayerOfTheMatch
               runs: 0,
               balls: 0,
               wickets: b.wickets,
+              photoUrl: playerInfo?.photoUrl,
             });
           }
         });
     });
 
-    // Auto-select best performer
     players.sort((a, b) => getImpactScore(b) - getImpactScore(a));
     const best = players[0];
     if (best) {
@@ -95,7 +98,6 @@ export default function PlayerOfTheMatch({ match, onComplete }: PlayerOfTheMatch
       animate={{ opacity: 1 }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm"
     >
-      {/* Confetti */}
       {Array.from({ length: 30 }).map((_, i) => (
         <motion.div
           key={i}
@@ -123,7 +125,7 @@ export default function PlayerOfTheMatch({ match, onComplete }: PlayerOfTheMatch
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         transition={{ type: 'spring', delay: 0.3 }}
-        className="text-center space-y-4 z-10"
+        className="text-center space-y-4 z-10 px-6"
       >
         <motion.div
           animate={{ rotate: [0, -10, 10, -10, 0] }}
@@ -133,9 +135,13 @@ export default function PlayerOfTheMatch({ match, onComplete }: PlayerOfTheMatch
           🏆
         </motion.div>
         <h2 className="text-2xl font-black">Player of the Match</h2>
-        <div className="bg-card rounded-2xl p-6 shadow-lg border-2 border-primary/30">
-          <div className="w-16 h-16 rounded-full bg-primary/20 mx-auto flex items-center justify-center mb-3">
-            <Star className="h-8 w-8 text-primary" />
+        <div className="bg-card rounded-2xl p-6 shadow-lg border-2 border-secondary/50">
+          <div className="w-20 h-20 rounded-full bg-secondary/20 mx-auto flex items-center justify-center mb-3 overflow-hidden border-3 border-secondary">
+            {bestPlayer.photoUrl ? (
+              <img src={bestPlayer.photoUrl} alt={bestPlayer.name} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-3xl font-black text-secondary">{bestPlayer.name.charAt(0)}</span>
+            )}
           </div>
           <h3 className="text-xl font-black">{bestPlayer.name}</h3>
           <p className="text-sm text-muted-foreground">{bestPlayer.team}</p>
