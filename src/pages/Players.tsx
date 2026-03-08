@@ -69,20 +69,27 @@ export default function Players() {
     refresh();
   };
 
-  const handlePhoto = () => fileRef.current?.click();
+  const handlePhoto = () => {
+    // Reset input value before clicking to ensure onChange fires even for same file
+    if (fileRef.current) {
+      fileRef.current.value = '';
+      fileRef.current.click();
+    }
+  };
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onloadend = () => setPhotoUrl(reader.result as string);
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      setPhotoUrl(result);
+    };
     reader.readAsDataURL(file);
-    e.target.value = '';
   };
 
   return (
     <div className="min-h-screen pb-24">
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
 
       <div className="cricket-gradient px-4 pb-6 pt-12 text-primary-foreground">
         <div className="mx-auto max-w-lg">
@@ -140,6 +147,7 @@ export default function Players() {
             <DialogTitle>{editPlayer ? 'Edit Player' : 'Add Player'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
             {/* Photo */}
             <div className="flex justify-center">
               <button onClick={handlePhoto} className="w-20 h-20 rounded-full bg-muted flex items-center justify-center overflow-hidden border-2 border-dashed border-border hover:border-primary transition-colors">
@@ -150,7 +158,7 @@ export default function Players() {
                 )}
               </button>
             </div>
-            <p className="text-xs text-center text-muted-foreground">Tap to add photo (optional)</p>
+            <p className="text-xs text-center text-muted-foreground">Tap to add photo (camera or gallery)</p>
 
             <Input
               value={name}
