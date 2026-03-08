@@ -41,6 +41,7 @@ export default function Teams() {
     setTeamName(team.name);
     setSelectedPlayers([...team.players]);
     setEditTeam(team);
+    setLogoUrl(team.logoUrl || '');
     setShowCreate(true);
   };
 
