@@ -98,8 +98,8 @@ export interface MatchSetup {
   villageName: string;
   date: string;
   totalOvers: number;
-  teamA: { name: string; players: Player[] };
-  teamB: { name: string; players: Player[] };
+  teamA: { name: string; players: Player[]; logoUrl?: string };
+  teamB: { name: string; players: Player[]; logoUrl?: string };
   tossWinner: 'A' | 'B';
   tossCall?: 'heads' | 'tails';
   battingFirst: 'A' | 'B';

@@ -129,9 +129,17 @@ export default function Scorecard() {
             <div key={inningsIdx} className="space-y-3 animate-fade-in">
               <Card className="p-4">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="font-bold text-base">{innings.teamName}</h2>
-                    <p className="text-xs text-muted-foreground">{inningsIdx === 0 ? '1st' : '2nd'} Innings</p>
+                  <div className="flex items-center gap-3">
+                    {(() => {
+                      const teamData = innings.teamName === match.setup.teamA.name ? match.setup.teamA : match.setup.teamB;
+                      return teamData?.logoUrl ? (
+                        <img src={teamData.logoUrl} alt={innings.teamName} className="w-10 h-10 rounded-full object-cover border-2 border-border" />
+                      ) : null;
+                    })()}
+                    <div>
+                      <h2 className="font-bold text-base">{innings.teamName}</h2>
+                      <p className="text-xs text-muted-foreground">{inningsIdx === 0 ? '1st' : '2nd'} Innings</p>
+                    </div>
                   </div>
                   <div className="text-right">
                     <p className="text-3xl font-black">{innings.totalRuns}/{innings.totalWickets}</p>

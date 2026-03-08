@@ -47,10 +47,22 @@ export function generateMatchPDF(match: Match) {
   match.innings.forEach((innings, idx) => {
     if (innings.ballEvents.length === 0 && idx === 1) return;
 
-    // Innings header
+    // Innings header with team logo
+    const teamData = innings.teamName === match.setup.teamA.name ? match.setup.teamA : match.setup.teamB;
+    
+    let headerX = 14;
+    if (teamData.logoUrl) {
+      try {
+        doc.addImage(teamData.logoUrl, 'JPEG', 14, yPos - 5, 8, 8);
+        headerX = 24;
+      } catch {
+        // skip
+      }
+    }
+
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text(`${innings.teamName} - ${innings.totalRuns}/${innings.totalWickets} (${getOversString(innings.totalBalls)} ov)`, 14, yPos);
+    doc.text(`${innings.teamName} - ${innings.totalRuns}/${innings.totalWickets} (${getOversString(innings.totalBalls)} ov)`, headerX, yPos);
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.text(`RR: ${getRunRate(innings.totalRuns, innings.totalBalls)}`, pageWidth - 14, yPos, { align: 'right' });
