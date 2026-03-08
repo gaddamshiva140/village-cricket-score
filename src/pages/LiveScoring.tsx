@@ -515,6 +515,127 @@ export default function LiveScoring() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Innings Setup Dialog */}
+      <Dialog open={showInningsSetup} onOpenChange={(open) => { if (!open) return; }}>
+        <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle>
+              <div className="space-y-1">
+                <span className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-primary" />
+                  {match.currentInnings === 0 ? '1st Innings Setup' : '2nd Innings Setup'}
+                </span>
+                <span className="block text-sm font-normal text-muted-foreground">
+                  Select striker, non-striker & opening bowler
+                </span>
+                {match.currentInnings === 1 && (
+                  <span className="block text-sm font-bold text-primary">
+                    Target: {match.innings[1].target} runs
+                  </span>
+                )}
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Batting Team Label */}
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+              🏏 {innings.teamName} - Batting
+            </p>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-bold">Striker</Label>
+              <Select value={setupStrikerId} onValueChange={setSetupStrikerId}>
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="Select striker..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {innings.battingOrder.filter(b => !b.isOut && b.playerId !== setupNonStrikerId).map(b => {
+                    const player = innings.players.find(p => p.id === b.playerId);
+                    return (
+                      <SelectItem key={b.playerId} value={b.playerId}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold overflow-hidden shrink-0">
+                            {player?.photoUrl ? <img src={player.photoUrl} alt="" className="w-full h-full object-cover" /> : b.playerName.charAt(0)}
+                          </div>
+                          {b.playerName}
+                          {player?.isCaptain && <span className="text-[10px] text-primary">(C)</span>}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-bold">Non-Striker</Label>
+              <Select value={setupNonStrikerId} onValueChange={setSetupNonStrikerId}>
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="Select non-striker..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {innings.battingOrder.filter(b => !b.isOut && b.playerId !== setupStrikerId).map(b => {
+                    const player = innings.players.find(p => p.id === b.playerId);
+                    return (
+                      <SelectItem key={b.playerId} value={b.playerId}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold overflow-hidden shrink-0">
+                            {player?.photoUrl ? <img src={player.photoUrl} alt="" className="w-full h-full object-cover" /> : b.playerName.charAt(0)}
+                          </div>
+                          {b.playerName}
+                          {player?.isCaptain && <span className="text-[10px] text-primary">(C)</span>}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Bowling Team Label */}
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+              ⚾ {match.currentInnings === 0 
+                ? (match.setup.battingFirst === 'A' ? match.setup.teamB.name : match.setup.teamA.name)
+                : (match.setup.battingFirst === 'A' ? match.setup.teamA.name : match.setup.teamB.name)
+              } - Bowling
+            </p>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-bold">Opening Bowler</Label>
+              <Select value={setupBowlerId} onValueChange={setSetupBowlerId}>
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue placeholder="Select bowler..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {innings.bowlingFigures.map(b => {
+                    const bPlayer = bowlingTeamPlayers.find(p => p.id === b.playerId);
+                    return (
+                      <SelectItem key={b.playerId} value={b.playerId}>
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold overflow-hidden shrink-0">
+                            {bPlayer?.photoUrl ? <img src={bPlayer.photoUrl} alt="" className="w-full h-full object-cover" /> : b.playerName.charAt(0)}
+                          </div>
+                          {b.playerName}
+                          {bPlayer?.isCaptain && <span className="text-[10px] text-primary">(C)</span>}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button 
+              onClick={handleInningsSetup} 
+              disabled={!setupStrikerId || !setupNonStrikerId || !setupBowlerId}
+              className="w-full h-12 font-bold rounded-xl text-base"
+            >
+              Start Innings 🏏
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
