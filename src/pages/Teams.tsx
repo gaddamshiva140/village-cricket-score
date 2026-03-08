@@ -143,7 +143,12 @@ export default function Teams() {
             <Card key={team.id} className="overflow-hidden">
               <CardHeader className="pb-2 flex flex-row items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
-                  🏏 {team.name}
+                  {team.logoUrl ? (
+                    <img src={team.logoUrl} alt={team.name} className="w-8 h-8 rounded-full object-cover border border-border" />
+                  ) : (
+                    <span>🏏</span>
+                  )}
+                  {team.name}
                   <span className="text-xs font-normal text-muted-foreground">({team.players.length} players)</span>
                 </CardTitle>
                 <div className="flex gap-1">
