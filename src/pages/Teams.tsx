@@ -23,6 +23,8 @@ export default function Teams() {
   const [teamName, setTeamName] = useState('');
   const [selectedPlayers, setSelectedPlayers] = useState<Player[]>([]);
   const [showPlayerPicker, setShowPlayerPicker] = useState(false);
+  const [logoUrl, setLogoUrl] = useState('');
+  const logoFileRef = useRef<HTMLInputElement>(null);
 
   const allPlayers = getAllPlayers();
   const refresh = () => setTeams(getAllTeams());
