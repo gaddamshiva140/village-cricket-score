@@ -51,6 +51,7 @@ export default function Teams() {
       id: editTeam?.id || crypto.randomUUID(),
       name: teamName.trim() || `Team ${getNextTeamNumber()}`,
       players: selectedPlayers,
+      logoUrl: logoUrl || undefined,
       createdAt: editTeam?.createdAt || Date.now(),
     };
     saveTeam(team);
