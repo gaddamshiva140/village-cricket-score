@@ -14,7 +14,7 @@ export function generateMatchPDF(match: Match) {
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${match.setup.groundName} • ${match.setup.villageName || ''} • ${match.setup.date}`, pageWidth / 2, 28, { align: 'center' });
+  doc.text(`${match.setup.groundName} • ${match.setup.date}`, pageWidth / 2, 28, { align: 'center' });
   doc.text(`${match.setup.totalOvers} overs match`, pageWidth / 2, 34, { align: 'center' });
 
   // Toss info
@@ -33,6 +33,16 @@ export function generateMatchPDF(match: Match) {
 
   let yPos = 56;
 
+  // Helper to add player photo
+  const addPlayerPhoto = (photoUrl: string | undefined, x: number, y: number, size: number) => {
+    if (!photoUrl) return;
+    try {
+      doc.addImage(photoUrl, 'JPEG', x, y, size, size);
+    } catch {
+      // Skip if image can't be added
+    }
+  };
+
   // Each innings
   match.innings.forEach((innings, idx) => {
     if (innings.ballEvents.length === 0 && idx === 1) return;
@@ -46,11 +56,13 @@ export function generateMatchPDF(match: Match) {
     doc.text(`RR: ${getRunRate(innings.totalRuns, innings.totalBalls)}`, pageWidth - 14, yPos, { align: 'right' });
     yPos += 4;
 
+    const allPlayers = [...match.setup.teamA.players, ...match.setup.teamB.players];
+
     // Batting table
     const battingData = innings.battingOrder
       .filter(b => b.balls > 0 || b.isOut)
       .map(b => {
-        const player = innings.players.find(p => p.id === b.playerId);
+        const player = allPlayers.find(p => p.id === b.playerId);
         const captainMark = player?.isCaptain ? ' (C)' : '';
         const status = b.isOut ? b.dismissalType || 'out' : 'not out';
         const sr = b.balls > 0 ? ((b.runs / b.balls) * 100).toFixed(0) : '-';
@@ -84,14 +96,13 @@ export function generateMatchPDF(match: Match) {
     yPos += 8;
 
     // Bowling table
+    const bowlingTeamPlayers = idx === 0
+      ? (match.setup.battingFirst === 'A' ? match.setup.teamB.players : match.setup.teamA.players)
+      : (match.setup.battingFirst === 'A' ? match.setup.teamA.players : match.setup.teamB.players);
+
     const bowlingData = innings.bowlingFigures
       .filter(b => b.overs > 0 || b.balls > 0)
       .map(b => {
-        const player = innings.players.find(p => p.id === b.playerId);
-        // bowler is from the other team, find captain from bowling team
-        const bowlingTeamPlayers = idx === 0 
-          ? (match.setup.battingFirst === 'A' ? match.setup.teamB.players : match.setup.teamA.players)
-          : (match.setup.battingFirst === 'A' ? match.setup.teamA.players : match.setup.teamB.players);
         const bowlerPlayer = bowlingTeamPlayers.find(p => p.id === b.playerId);
         const captainMark = bowlerPlayer?.isCaptain ? ' (C)' : '';
         const totalBalls = b.overs * 6 + b.balls;
@@ -118,20 +129,78 @@ export function generateMatchPDF(match: Match) {
 
     yPos = (doc as any).lastAutoTable.finalY + 10;
 
-    // Check if we need a new page
     if (yPos > 250) {
       doc.addPage();
       yPos = 20;
     }
   });
 
-  // Player of the Match
+  // Player Runs Bar Chart Summary (text-based)
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Player Runs Summary', 14, yPos);
+  yPos += 5;
+
+  const allBatsmen = match.innings.flatMap(inn =>
+    inn.battingOrder.filter(b => b.balls > 0 || b.isOut).map(b => ({ name: b.playerName, runs: b.runs }))
+  );
+
+  if (allBatsmen.length > 0) {
+    const maxRuns = Math.max(...allBatsmen.map(b => b.runs));
+    const barMaxWidth = 100;
+
+    allBatsmen.forEach(b => {
+      if (yPos > 270) {
+        doc.addPage();
+        yPos = 20;
+      }
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text(b.name, 14, yPos + 3);
+      const barWidth = maxRuns > 0 ? (b.runs / maxRuns) * barMaxWidth : 0;
+      doc.setFillColor(34, 87, 50);
+      doc.rect(55, yPos - 1, barWidth, 4, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.text(String(b.runs), 55 + barWidth + 3, yPos + 3);
+      yPos += 7;
+    });
+  }
+
+  yPos += 5;
+
+  // Player of the Match with photo
   if (match.playerOfTheMatchName) {
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('🏆 Player of the Match', pageWidth / 2, yPos, { align: 'center' });
+    if (yPos > 240) {
+      doc.addPage();
+      yPos = 20;
+    }
+
     doc.setFontSize(14);
-    doc.text(match.playerOfTheMatchName, pageWidth / 2, yPos + 8, { align: 'center' });
+    doc.setFont('helvetica', 'bold');
+    doc.text('Player of the Match', pageWidth / 2, yPos, { align: 'center' });
+    yPos += 8;
+
+    // Try to add player photo
+    if (match.playerOfTheMatch) {
+      const allPlayers = [...match.setup.teamA.players, ...match.setup.teamB.players];
+      const potmPlayer = allPlayers.find(p => p.id === match.playerOfTheMatch);
+      if (potmPlayer?.photoUrl) {
+        try {
+          doc.addImage(potmPlayer.photoUrl, 'JPEG', pageWidth / 2 - 10, yPos, 20, 20);
+          yPos += 24;
+        } catch {
+          // skip
+        }
+      }
+    }
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(match.playerOfTheMatchName, pageWidth / 2, yPos, { align: 'center' });
+    yPos += 6;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text('🏆 Player of the Match', pageWidth / 2, yPos, { align: 'center' });
   }
 
   // Footer
