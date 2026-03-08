@@ -88,8 +88,18 @@ export default function Teams() {
 
   const availablePlayers = allPlayers.filter(p => !selectedPlayers.find(sp => sp.id === p.id));
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setLogoUrl(reader.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
   return (
     <div className="min-h-screen pb-24">
+      <input ref={logoFileRef} type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
       <div className="cricket-gradient px-4 pb-6 pt-12 text-primary-foreground">
         <div className="mx-auto max-w-lg">
           <button onClick={() => navigate('/')} className="mb-3 flex items-center gap-1 text-sm opacity-80 hover:opacity-100">
