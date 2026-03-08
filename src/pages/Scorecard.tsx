@@ -116,7 +116,7 @@ export default function Scorecard() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground font-medium">🏆 Player of the Match</p>
-                <p className="font-black text-lg">{match.playerOfTheMatchName}</p>
+                <p className="font-black text-lg">Player of the Match: {match.playerOfTheMatchName}</p>
               </div>
             </div>
           </Card>
