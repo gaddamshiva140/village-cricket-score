@@ -131,12 +131,9 @@ export default function Scorecard() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     {(() => {
-                      const teamData = innings.teamId === match.setup.teamA.players[0]?.id?.substring(0, 0) ? null :
-                        match.innings[inningsIdx].teamName === match.setup.teamA.name ? match.setup.teamA :
-                        match.setup.teamB;
-                      const logoUrl = teamData?.logoUrl;
-                      return logoUrl ? (
-                        <img src={logoUrl} alt={innings.teamName} className="w-10 h-10 rounded-full object-cover border-2 border-border" />
+                      const teamData = innings.teamName === match.setup.teamA.name ? match.setup.teamA : match.setup.teamB;
+                      return teamData?.logoUrl ? (
+                        <img src={teamData.logoUrl} alt={innings.teamName} className="w-10 h-10 rounded-full object-cover border-2 border-border" />
                       ) : null;
                     })()}
                     <div>
