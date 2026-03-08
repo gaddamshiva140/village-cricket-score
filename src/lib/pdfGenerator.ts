@@ -183,13 +183,9 @@ export function generateMatchPDF(match: Match) {
       }
     }
 
-    doc.setFontSize(16);
+    doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text(match.playerOfTheMatchName, pageWidth / 2, yPos, { align: 'center' });
-    yPos += 6;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.text('🏆 Player of the Match', pageWidth / 2, yPos, { align: 'center' });
+    doc.text(`Player of the Match: ${match.playerOfTheMatchName}`, pageWidth / 2, yPos, { align: 'center' });
   }
 
   // Footer

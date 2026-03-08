@@ -269,7 +269,7 @@ export default function LiveScoring() {
                 <PlayerAvatar player={strikerPlayer} />
                 <span className="font-bold">{striker?.playerName || '-'}</span>
                 {strikerPlayer?.isCaptain && <span className="text-[10px] text-primary font-bold">(C)</span>}
-                <span className="text-xs text-primary font-bold">*</span>
+                <span className="text-xs">🏏</span>
               </div>
               <span className="font-mono font-bold">{striker?.runs} ({striker?.balls})</span>
             </div>

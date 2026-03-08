@@ -29,8 +29,16 @@ export default function Teams() {
   const allPlayers = getAllPlayers();
   const refresh = () => setTeams(getAllTeams());
 
+  const DEFAULT_TEAM_NAMES = ['Warriors', 'Fighters', 'Titans', 'Strikers', 'Gladiators', 'Panthers', 'Eagles', 'Lions', 'Wolves', 'Royals', 'Kings', 'Challengers', 'Blazers', 'Thunder', 'Spartans'];
+
+  const getDefaultTeamName = () => {
+    const usedNames = teams.map(t => t.name);
+    const available = DEFAULT_TEAM_NAMES.filter(n => !usedNames.includes(n));
+    return available.length > 0 ? available[Math.floor(Math.random() * available.length)] : `Team ${getNextTeamNumber()}`;
+  };
+
   const openCreate = () => {
-    setTeamName(`Team ${getNextTeamNumber()}`);
+    setTeamName(getDefaultTeamName());
     setSelectedPlayers([]);
     setEditTeam(null);
     setLogoUrl('');
