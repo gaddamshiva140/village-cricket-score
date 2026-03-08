@@ -33,6 +33,7 @@ export default function Teams() {
     setTeamName(`Team ${getNextTeamNumber()}`);
     setSelectedPlayers([]);
     setEditTeam(null);
+    setLogoUrl('');
     setShowCreate(true);
   };
 
