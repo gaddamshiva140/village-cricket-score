@@ -132,6 +132,34 @@ export default function LiveScoring() {
     setShowNextBatsman(false);
   }, [match]);
 
+  const handleInningsSetup = useCallback(() => {
+    if (!match || !setupStrikerId || !setupNonStrikerId || !setupBowlerId) return;
+    const currentInn = getCurrentInnings(match);
+    
+    const strikerIdx = currentInn.battingOrder.findIndex(b => b.playerId === setupStrikerId);
+    const nonStrikerIdx = currentInn.battingOrder.findIndex(b => b.playerId === setupNonStrikerId);
+    const bowlerIdx = currentInn.bowlingFigures.findIndex(b => b.playerId === setupBowlerId);
+    
+    if (strikerIdx >= 0) currentInn.currentBatsmanIndex = strikerIdx;
+    if (nonStrikerIdx >= 0) currentInn.nonStrikerIndex = nonStrikerIdx;
+    if (bowlerIdx >= 0) currentInn.currentBowlerIndex = bowlerIdx;
+    
+    const str = currentInn.battingOrder[currentInn.currentBatsmanIndex];
+    const ns = currentInn.battingOrder[currentInn.nonStrikerIndex];
+    currentInn.currentPartnership.batsman1Id = str.playerId;
+    currentInn.currentPartnership.batsman1Name = str.playerName;
+    currentInn.currentPartnership.batsman2Id = ns.playerId;
+    currentInn.currentPartnership.batsman2Name = ns.playerName;
+    
+    match.updatedAt = Date.now();
+    saveMatch(match);
+    setMatch({ ...match });
+    setShowInningsSetup(false);
+    setSetupStrikerId('');
+    setSetupNonStrikerId('');
+    setSetupBowlerId('');
+  }, [match, setupStrikerId, setupNonStrikerId, setupBowlerId]);
+
   const handleUndo = useCallback(() => {
     if (!match) return;
     const updated = undoLastBall(match);
