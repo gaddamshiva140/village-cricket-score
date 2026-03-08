@@ -147,6 +147,7 @@ export default function Players() {
             <DialogTitle>{editPlayer ? 'Edit Player' : 'Add Player'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
             {/* Photo */}
             <div className="flex justify-center">
               <button onClick={handlePhoto} className="w-20 h-20 rounded-full bg-muted flex items-center justify-center overflow-hidden border-2 border-dashed border-border hover:border-primary transition-colors">
@@ -157,7 +158,7 @@ export default function Players() {
                 )}
               </button>
             </div>
-            <p className="text-xs text-center text-muted-foreground">Tap to add photo (optional)</p>
+            <p className="text-xs text-center text-muted-foreground">Tap to add photo (camera or gallery)</p>
 
             <Input
               value={name}
