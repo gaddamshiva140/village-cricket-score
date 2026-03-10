@@ -1,38 +1,78 @@
+import { supabase } from '@/integrations/supabase/client';
 import { Player } from '@/types/cricket';
-
-const TEAMS_KEY = 'village_cricket_teams';
 
 export interface SavedTeam {
   id: string;
   name: string;
   players: Player[];
-  logoUrl?: string; // base64 data URL
+  logoUrl?: string;
   createdAt: number;
 }
 
-export function getAllTeams(): SavedTeam[] {
-  const data = localStorage.getItem(TEAMS_KEY);
-  return data ? JSON.parse(data) : [];
+export async function getAllTeams(): Promise<SavedTeam[]> {
+  const { data, error } = await supabase
+    .from('teams')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching teams:', error);
+    return [];
+  }
+
+  // We need to fetch players for each team
+  const allPlayerIds = (data || []).flatMap(t => t.player_ids || []);
+  let playerMap: Record<string, Player> = {};
+
+  if (allPlayerIds.length > 0) {
+    const { data: players } = await supabase
+      .from('players')
+      .select('*')
+      .in('id', allPlayerIds);
+
+    if (players) {
+      playerMap = Object.fromEntries(players.map(p => [p.id, {
+        id: p.id,
+        name: p.name,
+        role: p.role || undefined,
+        photoUrl: p.photo_url || undefined,
+      } as Player]));
+    }
+  }
+
+  return (data || []).map(t => ({
+    id: t.id,
+    name: t.name,
+    players: (t.player_ids || []).map((pid: string) => playerMap[pid]).filter(Boolean),
+    logoUrl: t.logo_url || undefined,
+    createdAt: new Date(t.created_at).getTime(),
+  }));
 }
 
-function saveTeams(teams: SavedTeam[]) {
-  localStorage.setItem(TEAMS_KEY, JSON.stringify(teams));
+export async function saveTeam(team: SavedTeam) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { error } = await supabase
+    .from('teams')
+    .upsert({
+      id: team.id,
+      user_id: user.id,
+      name: team.name,
+      player_ids: team.players.map(p => p.id),
+      logo_url: team.logoUrl || null,
+    }, { onConflict: 'id' });
+
+  if (error) console.error('Error saving team:', error);
 }
 
-export function saveTeam(team: SavedTeam) {
-  const teams = getAllTeams();
-  const idx = teams.findIndex(t => t.id === team.id);
-  if (idx >= 0) teams[idx] = team;
-  else teams.unshift(team);
-  saveTeams(teams);
+export async function deleteTeam(id: string) {
+  const { error } = await supabase.from('teams').delete().eq('id', id);
+  if (error) console.error('Error deleting team:', error);
 }
 
-export function deleteTeam(id: string) {
-  saveTeams(getAllTeams().filter(t => t.id !== id));
-}
-
-export function getNextTeamNumber(): number {
-  const teams = getAllTeams();
+export async function getNextTeamNumber(): Promise<number> {
+  const teams = await getAllTeams();
   let max = 0;
   teams.forEach(t => {
     const match = t.name.match(/^Team (\d+)$/);
