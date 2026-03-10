@@ -1,12 +1,24 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { PlusCircle, Clock, Trophy, Users, User } from 'lucide-react';
+import { PlusCircle, Clock, Trophy, Users, User, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getAllMatches, getActiveMatchId } from '@/lib/matchStore';
-import { getOversString } from '@/lib/matchStore';
+import { getAllMatches, getActiveMatchId, getOversString } from '@/lib/matchStore';
+import { Match } from '@/types/cricket';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Home() {
-  const matches = getAllMatches();
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [loading, setLoading] = useState(true);
   const activeMatchId = getActiveMatchId();
+  const { user, signOut } = useAuth();
+
+  useEffect(() => {
+    getAllMatches().then(m => {
+      setMatches(m);
+      setLoading(false);
+    });
+  }, []);
+
   const liveMatch = activeMatchId ? matches.find(m => m.id === activeMatchId && m.status === 'live') : null;
   const recentMatches = matches.filter(m => m.status === 'completed').slice(0, 3);
 
@@ -15,11 +27,17 @@ export default function Home() {
       {/* Hero */}
       <div className="cricket-gradient px-4 pb-8 pt-12 text-primary-foreground">
         <div className="mx-auto max-w-lg">
-          <div className="flex items-center gap-3 mb-2">
-            <span className="text-3xl">🏏</span>
-            <h1 className="text-3xl font-black tracking-tight">Village Cricket Pro</h1>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">🏏</span>
+              <h1 className="text-3xl font-black tracking-tight">Village Cricket Pro</h1>
+            </div>
+            <Button variant="ghost" size="icon" className="text-primary-foreground/80 hover:text-primary-foreground" onClick={signOut}>
+              <LogOut className="h-5 w-5" />
+            </Button>
           </div>
           <p className="text-primary-foreground/80 font-medium">Score your village matches like a pro</p>
+          {user && <p className="text-primary-foreground/60 text-xs mt-1">{user.email}</p>}
         </div>
       </div>
 
@@ -116,7 +134,7 @@ export default function Home() {
         )}
 
         {/* Empty State */}
-        {matches.length === 0 && (
+        {!loading && matches.length === 0 && (
           <div className="text-center py-12">
             <span className="text-6xl mb-4 block">🏟️</span>
             <h3 className="text-xl font-bold mb-2">No matches yet</h3>
