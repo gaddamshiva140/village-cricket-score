@@ -1,19 +1,56 @@
 import { Match, MatchSetup, InningsData, BallEvent, BatsmanScore, BowlerFigures, Player, DismissalType, BallType } from '@/types/cricket';
+import { supabase } from '@/integrations/supabase/client';
 
-const MATCHES_KEY = 'village_cricket_matches';
 const ACTIVE_MATCH_KEY = 'village_cricket_active_match';
 
-export function getAllMatches(): Match[] {
-  const data = localStorage.getItem(MATCHES_KEY);
-  return data ? JSON.parse(data) : [];
+export async function getAllMatches(): Promise<Match[]> {
+  const { data, error } = await supabase
+    .from('matches')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching matches:', error);
+    return [];
+  }
+
+  return (data || []).map(rowToMatch);
 }
 
-export function saveMatch(match: Match) {
-  const matches = getAllMatches();
-  const idx = matches.findIndex(m => m.id === match.id);
-  if (idx >= 0) matches[idx] = match;
-  else matches.unshift(match);
-  localStorage.setItem(MATCHES_KEY, JSON.stringify(matches));
+function rowToMatch(row: any): Match {
+  return {
+    id: row.id,
+    setup: row.setup as MatchSetup,
+    innings: row.innings as [InningsData, InningsData],
+    currentInnings: row.current_innings as 0 | 1,
+    status: row.status as 'live' | 'completed' | 'abandoned',
+    result: row.result || undefined,
+    playerOfTheMatch: row.player_of_the_match || undefined,
+    playerOfTheMatchName: row.player_of_the_match_name || undefined,
+    createdAt: new Date(row.created_at).getTime(),
+    updatedAt: new Date(row.updated_at).getTime(),
+  };
+}
+
+export async function saveMatch(match: Match) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const { error } = await supabase
+    .from('matches')
+    .upsert({
+      id: match.id,
+      user_id: user.id,
+      setup: match.setup as any,
+      innings: match.innings as any,
+      current_innings: match.currentInnings,
+      status: match.status,
+      result: match.result || null,
+      player_of_the_match: match.playerOfTheMatch || null,
+      player_of_the_match_name: match.playerOfTheMatchName || null,
+    }, { onConflict: 'id' });
+
+  if (error) console.error('Error saving match:', error);
 }
 
 export function getActiveMatchId(): string | null {
@@ -25,8 +62,15 @@ export function setActiveMatchId(id: string | null) {
   else localStorage.removeItem(ACTIVE_MATCH_KEY);
 }
 
-export function getMatch(id: string): Match | null {
-  return getAllMatches().find(m => m.id === id) || null;
+export async function getMatch(id: string): Promise<Match | null> {
+  const { data, error } = await supabase
+    .from('matches')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return rowToMatch(data);
 }
 
 function createInnings(teamName: string, teamId: string, players: Player[], bowlingPlayers: Player[], target?: number): InningsData {
@@ -84,7 +128,7 @@ function createInnings(teamName: string, teamId: string, players: Player[], bowl
   };
 }
 
-export function createMatch(setup: MatchSetup): Match {
+export async function createMatch(setup: MatchSetup): Promise<Match> {
   const battingTeam = setup.battingFirst === 'A' ? setup.teamA : setup.teamB;
   const bowlingTeam = setup.battingFirst === 'A' ? setup.teamB : setup.teamA;
   const battingTeamId = setup.battingFirst === 'A' ? 'A' : 'B';
@@ -103,7 +147,7 @@ export function createMatch(setup: MatchSetup): Match {
     updatedAt: Date.now(),
   };
 
-  saveMatch(match);
+  await saveMatch(match);
   setActiveMatchId(match.id);
   return match;
 }
@@ -142,11 +186,11 @@ export function recordBall(
   if (ballType === 'normal') {
     batsmanRuns = runs;
   } else if (ballType === 'noball') {
-    extras = 1; // 1 run penalty
-    batsmanRuns = runs; // batsman gets credited for runs hit
+    extras = 1;
+    batsmanRuns = runs;
     totalRunsForBall = runs + 1;
   } else if (ballType === 'wide') {
-    extras = 1 + runs; // 1 wide + any additional runs
+    extras = 1 + runs;
     batsmanRuns = 0;
     totalRunsForBall = 1 + runs;
   } else if (ballType === 'legbye') {
@@ -173,15 +217,12 @@ export function recordBall(
     timestamp: Date.now(),
   };
 
-  // Update batsman
   striker.runs += batsmanRuns;
   if (isLegal || ballType === 'noball') striker.balls += (isLegal ? 1 : 0);
-  // Count balls faced on no-balls too
   if (ballType === 'noball') striker.balls += 1;
   if (batsmanRuns === 4 || (ballType === 'normal' && runs === 4)) striker.fours += 1;
   if (batsmanRuns === 6 || (ballType === 'normal' && runs === 6)) striker.sixes += 1;
 
-  // Update bowler
   bowler.runs += totalRunsForBall;
   if (isLegal) {
     bowler.balls += 1;
@@ -193,49 +234,40 @@ export function recordBall(
   if (ballType === 'noball') bowler.noBalls += 1;
   if (ballType === 'wide') bowler.wides += 1;
 
-  // Update innings totals
   innings.totalRuns += totalRunsForBall;
   if (isLegal) innings.totalBalls += 1;
 
-  // Update extras
   if (ballType === 'wide') innings.extras.wides += 1 + runs;
   if (ballType === 'noball') innings.extras.noBalls += 1;
   if (ballType === 'legbye') innings.extras.legByes += runs;
   if (ballType === 'bye') innings.extras.byes += runs;
   innings.extras.total += extras;
 
-  // Update partnership
   innings.currentPartnership.runs += totalRunsForBall;
   innings.currentPartnership.balls += isLegal ? 1 : 0;
 
-  // Determine animation
   let animationType: 'four' | 'six' | 'wicket' | 'fifty' | 'hundred' | undefined;
   if (isWicket) animationType = 'wicket';
   else if (runs === 6 && (ballType === 'normal' || ballType === 'noball')) animationType = 'six';
   else if (runs === 4 && (ballType === 'normal' || ballType === 'noball')) animationType = 'four';
 
-  // Check milestones
   if (!animationType && striker.runs >= 100 && striker.runs - batsmanRuns < 100) animationType = 'hundred';
   else if (!animationType && striker.runs >= 50 && striker.runs - batsmanRuns < 50) animationType = 'fifty';
 
-  // Handle wicket
   if (isWicket) {
     striker.isOut = true;
     striker.dismissalType = dismissalType;
     innings.totalWickets += 1;
     bowler.wickets += 1;
 
-    // End current partnership
     innings.currentPartnership.isActive = false;
     innings.partnerships.push({ ...innings.currentPartnership });
 
-    // Next batsman
     const nextBatIdx = innings.battingOrder.findIndex((b, i) =>
       i !== innings.currentBatsmanIndex && i !== innings.nonStrikerIndex && !b.isOut
     );
     if (nextBatIdx >= 0) {
       innings.currentBatsmanIndex = nextBatIdx;
-      // Start new partnership
       const newBatsman = innings.battingOrder[nextBatIdx];
       const nonStriker = innings.battingOrder[innings.nonStrikerIndex];
       innings.currentPartnership = {
@@ -248,16 +280,13 @@ export function recordBall(
     }
   }
 
-  // Rotate strike on odd runs (for legal deliveries and no-balls)
   if (!isWicket && totalRunsForBall % 2 === 1) {
     const temp = innings.currentBatsmanIndex;
     innings.currentBatsmanIndex = innings.nonStrikerIndex;
     innings.nonStrikerIndex = temp;
   }
 
-  // Auto end over
   if (isLegal && innings.totalBalls % 6 === 0 && innings.totalBalls > 0) {
-    // Rotate strike at end of over
     const temp = innings.currentBatsmanIndex;
     innings.currentBatsmanIndex = innings.nonStrikerIndex;
     innings.nonStrikerIndex = temp;
@@ -265,7 +294,6 @@ export function recordBall(
 
   innings.ballEvents.push(event);
 
-  // Check innings completion
   const allOut = innings.totalWickets >= innings.players.length - 1;
   const oversComplete = innings.totalBalls >= match.setup.totalOvers * 6;
   const targetChased = match.currentInnings === 1 && innings.target && innings.totalRuns >= innings.target;
@@ -282,6 +310,7 @@ export function recordBall(
   }
 
   match.updatedAt = Date.now();
+  // Fire and forget - don't await during live scoring for responsiveness
   saveMatch(match);
   return { match, event, animationType };
 }
@@ -294,13 +323,11 @@ export function undoLastBall(match: Match): Match {
   const striker = innings.battingOrder.find(b => b.playerId === lastEvent.batsmanId)!;
   const bowler = innings.bowlingFigures.find(b => b.playerId === lastEvent.bowlerId)!;
 
-  // Reverse batsman stats
   striker.runs -= lastEvent.batsmanRuns;
   if (lastEvent.isLegal || lastEvent.ballType === 'noball') striker.balls -= 1;
   if (lastEvent.batsmanRuns === 4) striker.fours -= 1;
   if (lastEvent.batsmanRuns === 6) striker.sixes -= 1;
 
-  // Reverse bowler stats
   bowler.runs -= lastEvent.runs;
   if (lastEvent.isLegal) {
     if (bowler.balls === 0) {
@@ -313,18 +340,15 @@ export function undoLastBall(match: Match): Match {
   if (lastEvent.ballType === 'noball') bowler.noBalls -= 1;
   if (lastEvent.ballType === 'wide') bowler.wides -= 1;
 
-  // Reverse innings totals
   innings.totalRuns -= lastEvent.runs;
   if (lastEvent.isLegal) innings.totalBalls -= 1;
 
-  // Reverse extras
   if (lastEvent.ballType === 'wide') innings.extras.wides -= (1 + lastEvent.runs - 1);
   if (lastEvent.ballType === 'noball') innings.extras.noBalls -= 1;
   if (lastEvent.ballType === 'legbye') innings.extras.legByes -= lastEvent.runs;
   if (lastEvent.ballType === 'bye') innings.extras.byes -= lastEvent.runs;
   innings.extras.total -= lastEvent.extras;
 
-  // Reverse wicket
   if (lastEvent.isWicket) {
     striker.isOut = false;
     striker.dismissalType = undefined;
@@ -333,7 +357,6 @@ export function undoLastBall(match: Match): Match {
     innings.currentBatsmanIndex = innings.battingOrder.findIndex(b => b.playerId === lastEvent.batsmanId);
   }
 
-  // Reverse strike rotation (simplified - not perfect for all edge cases)
   if (!lastEvent.isWicket && lastEvent.runs % 2 === 1) {
     const temp = innings.currentBatsmanIndex;
     innings.currentBatsmanIndex = innings.nonStrikerIndex;
@@ -385,11 +408,9 @@ export function retireOut(match: Match): { match: Match; needsNextBatsman: boole
   striker.dismissalType = 'Retired Out';
   innings.totalWickets += 1;
 
-  // End current partnership
   innings.currentPartnership.isActive = false;
   innings.partnerships.push({ ...innings.currentPartnership });
 
-  // Find next batsman
   const nextBatIdx = innings.battingOrder.findIndex((b, i) =>
     i !== innings.currentBatsmanIndex && i !== innings.nonStrikerIndex && !b.isOut
   );
@@ -408,7 +429,6 @@ export function retireOut(match: Match): { match: Match; needsNextBatsman: boole
     };
     needsNextBatsman = true;
   } else {
-    // All out
     innings.isCompleted = true;
     if (match.currentInnings === 0) {
       match.currentInnings = 1;
@@ -424,8 +444,7 @@ export function retireOut(match: Match): { match: Match; needsNextBatsman: boole
   return { match, needsNextBatsman };
 }
 
-export function deleteMatch(id: string) {
-  const matches = getAllMatches().filter(m => m.id !== id);
-  localStorage.setItem(MATCHES_KEY, JSON.stringify(matches));
+export async function deleteMatch(id: string) {
+  await supabase.from('matches').delete().eq('id', id);
   if (getActiveMatchId() === id) setActiveMatchId(null);
 }

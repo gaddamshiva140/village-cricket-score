@@ -3,17 +3,21 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trophy, Trash2, Star } from 'lucide-react';
 import { getAllMatches, getOversString, deleteMatch } from '@/lib/matchStore';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Match } from '@/types/cricket';
 
 export default function MatchHistory() {
-  const [matches, setMatches] = useState<Match[]>(getAllMatches());
+  const [matches, setMatches] = useState<Match[]>([]);
 
-  const handleDelete = (id: string, e: React.MouseEvent) => {
+  const refresh = () => getAllMatches().then(setMatches);
+
+  useEffect(() => { refresh(); }, []);
+
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    deleteMatch(id);
-    setMatches(getAllMatches());
+    await deleteMatch(id);
+    refresh();
   };
 
   return (

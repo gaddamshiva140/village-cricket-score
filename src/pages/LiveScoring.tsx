@@ -34,19 +34,19 @@ export default function LiveScoring() {
 
   useEffect(() => {
     if (id) {
-      const m = getMatch(id);
-      if (m) {
-        if (m.status === 'completed') {
-          navigate(`/scorecard/${id}`);
-          return;
+      getMatch(id).then(m => {
+        if (m) {
+          if (m.status === 'completed') {
+            navigate(`/scorecard/${id}`);
+            return;
+          }
+          setMatch(m);
+          const currentInnings = m.innings[m.currentInnings];
+          if (currentInnings.totalBalls === 0) {
+            setShowInningsSetup(true);
+          }
         }
-        setMatch(m);
-        // Show initial setup if no balls bowled yet in current innings
-        const currentInnings = m.innings[m.currentInnings];
-        if (currentInnings.totalBalls === 0) {
-          setShowInningsSetup(true);
-        }
-      }
+      });
     }
   }, [id, navigate]);
 

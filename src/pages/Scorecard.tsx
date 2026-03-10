@@ -19,11 +19,12 @@ export default function Scorecard() {
 
   useEffect(() => {
     if (id) {
-      const m = getMatch(id);
-      setMatch(m);
-      if (m && searchParams.get('potm') === 'true' && !m.playerOfTheMatch) {
-        setShowPOTM(true);
-      }
+      getMatch(id).then(m => {
+        setMatch(m);
+        if (m && searchParams.get('potm') === 'true' && !m.playerOfTheMatch) {
+          setShowPOTM(true);
+        }
+      });
     }
   }, [id, searchParams]);
 

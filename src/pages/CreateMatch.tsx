@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,11 +22,15 @@ export default function CreateMatch() {
   const [useCustomOvers, setUseCustomOvers] = useState(false);
   const [selectedTeamA, setSelectedTeamA] = useState<SavedTeam | null>(null);
   const [selectedTeamB, setSelectedTeamB] = useState<SavedTeam | null>(null);
+  const [teams, setTeams] = useState<SavedTeam[]>([]);
 
-  const teams = getAllTeams();
+  useEffect(() => {
+    getAllTeams().then(setTeams);
+  }, []);
+
   const effectiveOvers = useCustomOvers ? (parseInt(customOvers) || 10) : totalOvers;
 
-  const handleTossComplete = (tossWinner: 'A' | 'B', tossCall: 'heads' | 'tails', battingFirst: 'A' | 'B') => {
+  const handleTossComplete = async (tossWinner: 'A' | 'B', tossCall: 'heads' | 'tails', battingFirst: 'A' | 'B') => {
     if (!selectedTeamA || !selectedTeamB) return;
 
     const teamAName = selectedTeamA.name;
@@ -46,13 +50,13 @@ export default function CreateMatch() {
       battingFirst,
     };
 
-    const match = createMatch(setup);
+    const match = await createMatch(setup);
     navigate(`/score/${match.id}`);
   };
 
   const stepLabels = ['Select Teams', 'Match Details', 'Coin Toss'];
   const canProceedStep0 = selectedTeamA && selectedTeamB && selectedTeamA.id !== selectedTeamB.id;
-  const canProceedStep1 = true; // ground is optional
+  const canProceedStep1 = true;
 
   return (
     <div className="min-h-screen pb-24">
@@ -62,7 +66,6 @@ export default function CreateMatch() {
             <ArrowLeft className="h-4 w-4" /> Back
           </button>
           <h1 className="text-2xl font-black">Create Match</h1>
-          {/* Stepper */}
           <div className="flex gap-1 mt-3 items-center">
             {stepLabels.map((label, s) => (
               <div key={s} className="flex items-center flex-1">
@@ -78,7 +81,6 @@ export default function CreateMatch() {
       </div>
 
       <div className="mx-auto max-w-lg px-4 -mt-3 space-y-4">
-        {/* Step 0: Select Teams */}
         {step === 0 && (
           <div className="space-y-4 animate-fade-in">
             {teams.length < 2 && (
@@ -97,7 +99,6 @@ export default function CreateMatch() {
 
             {teams.length >= 2 && (
               <>
-                {/* Team A Selection */}
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base">Team A</CardTitle>
@@ -131,7 +132,6 @@ export default function CreateMatch() {
                   </CardContent>
                 </Card>
 
-                {/* Team B Selection */}
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-base">Team B</CardTitle>
@@ -173,7 +173,6 @@ export default function CreateMatch() {
           </div>
         )}
 
-        {/* Step 1: Match Details */}
         {step === 1 && (
           <Card className="animate-fade-in">
             <CardHeader>
@@ -210,7 +209,6 @@ export default function CreateMatch() {
           </Card>
         )}
 
-        {/* Step 2: Coin Toss */}
         {step === 2 && (
           <Card className="animate-fade-in">
             <CardHeader>

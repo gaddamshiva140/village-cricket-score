@@ -1,9 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, Plus, Trash2, Camera, Pencil, Check, User } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Camera, Pencil, User } from 'lucide-react';
 import { getAllPlayers, savePlayer, deletePlayer, SavedPlayer } from '@/lib/playerStore';
 import { PlayerRole } from '@/types/cricket';
 import {
@@ -24,7 +24,7 @@ const ROLES: PlayerRole[] = ['Batsman', 'Bowler', 'All-Rounder', 'Wicket Keeper'
 
 export default function Players() {
   const navigate = useNavigate();
-  const [players, setPlayers] = useState<SavedPlayer[]>(getAllPlayers());
+  const [players, setPlayers] = useState<SavedPlayer[]>([]);
   const [showDialog, setShowDialog] = useState(false);
   const [editPlayer, setEditPlayer] = useState<SavedPlayer | null>(null);
   const [name, setName] = useState('');
@@ -32,7 +32,9 @@ export default function Players() {
   const [photoUrl, setPhotoUrl] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const refresh = () => setPlayers(getAllPlayers());
+  const refresh = () => getAllPlayers().then(setPlayers);
+
+  useEffect(() => { refresh(); }, []);
 
   const openCreate = () => {
     setEditPlayer(null);
@@ -50,7 +52,7 @@ export default function Players() {
     setShowDialog(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) return;
     const player: SavedPlayer = {
       id: editPlayer?.id || crypto.randomUUID(),
@@ -59,18 +61,17 @@ export default function Players() {
       photoUrl: photoUrl || undefined,
       createdAt: editPlayer?.createdAt || Date.now(),
     };
-    savePlayer(player);
+    await savePlayer(player);
     setShowDialog(false);
     refresh();
   };
 
-  const handleDelete = (id: string) => {
-    deletePlayer(id);
+  const handleDelete = async (id: string) => {
+    await deletePlayer(id);
     refresh();
   };
 
   const handlePhoto = () => {
-    // Reset input value before clicking to ensure onChange fires even for same file
     if (fileRef.current) {
       fileRef.current.value = '';
       fileRef.current.click();
@@ -90,7 +91,6 @@ export default function Players() {
 
   return (
     <div className="min-h-screen pb-24">
-
       <div className="cricket-gradient px-4 pb-6 pt-12 text-primary-foreground">
         <div className="mx-auto max-w-lg">
           <button onClick={() => navigate('/')} className="mb-3 flex items-center gap-1 text-sm opacity-80 hover:opacity-100">
@@ -148,7 +148,6 @@ export default function Players() {
           </DialogHeader>
           <div className="space-y-4">
             <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
-            {/* Photo */}
             <div className="flex justify-center">
               <button onClick={handlePhoto} className="w-20 h-20 rounded-full bg-muted flex items-center justify-center overflow-hidden border-2 border-dashed border-border hover:border-primary transition-colors">
                 {photoUrl ? (

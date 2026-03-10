@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,8 @@ import { Link } from 'react-router-dom';
 
 export default function Teams() {
   const navigate = useNavigate();
-  const [teams, setTeams] = useState<SavedTeam[]>(getAllTeams());
+  const [teams, setTeams] = useState<SavedTeam[]>([]);
+  const [allPlayers, setAllPlayers] = useState<SavedPlayer[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [editTeam, setEditTeam] = useState<SavedTeam | null>(null);
   const [teamName, setTeamName] = useState('');
@@ -26,15 +27,20 @@ export default function Teams() {
   const [logoUrl, setLogoUrl] = useState('');
   const logoFileRef = useRef<HTMLInputElement>(null);
 
-  const allPlayers = getAllPlayers();
-  const refresh = () => setTeams(getAllTeams());
+  const refresh = async () => {
+    const [t, p] = await Promise.all([getAllTeams(), getAllPlayers()]);
+    setTeams(t);
+    setAllPlayers(p);
+  };
+
+  useEffect(() => { refresh(); }, []);
 
   const DEFAULT_TEAM_NAMES = ['Warriors', 'Fighters', 'Titans', 'Strikers', 'Gladiators', 'Panthers', 'Eagles', 'Lions', 'Wolves', 'Royals', 'Kings', 'Challengers', 'Blazers', 'Thunder', 'Spartans'];
 
   const getDefaultTeamName = () => {
     const usedNames = teams.map(t => t.name);
     const available = DEFAULT_TEAM_NAMES.filter(n => !usedNames.includes(n));
-    return available.length > 0 ? available[Math.floor(Math.random() * available.length)] : `Team ${getNextTeamNumber()}`;
+    return available.length > 0 ? available[Math.floor(Math.random() * available.length)] : `Team ${teams.length + 1}`;
   };
 
   const openCreate = () => {
@@ -53,22 +59,23 @@ export default function Teams() {
     setShowCreate(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (selectedPlayers.length < 2) return;
+    const nextNum = await getNextTeamNumber();
     const team: SavedTeam = {
       id: editTeam?.id || crypto.randomUUID(),
-      name: teamName.trim() || `Team ${getNextTeamNumber()}`,
+      name: teamName.trim() || `Team ${nextNum}`,
       players: selectedPlayers,
       logoUrl: logoUrl || undefined,
       createdAt: editTeam?.createdAt || Date.now(),
     };
-    saveTeam(team);
+    await saveTeam(team);
     setShowCreate(false);
     refresh();
   };
 
-  const handleDelete = (id: string) => {
-    deleteTeam(id);
+  const handleDelete = async (id: string) => {
+    await deleteTeam(id);
     refresh();
   };
 
@@ -195,7 +202,6 @@ export default function Teams() {
             <DialogTitle>{editTeam ? 'Edit Team' : 'Create Team'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Team Logo */}
             <div className="flex justify-center">
               <button
                 onClick={() => logoFileRef.current?.click()}
@@ -217,7 +223,6 @@ export default function Teams() {
               className="text-lg font-bold h-12"
             />
 
-            {/* Selected Players - tap to make captain */}
             <div>
               <p className="text-sm font-medium mb-1">Team Players ({selectedPlayers.length})</p>
               <p className="text-xs text-muted-foreground mb-2">Tap a player card to make them captain</p>
@@ -265,7 +270,6 @@ export default function Teams() {
               </div>
             </div>
 
-            {/* Add Players */}
             <div>
               <Button variant="outline" className="w-full rounded-xl gap-2" onClick={() => setShowPlayerPicker(true)}>
                 <Plus className="h-4 w-4" /> Add Players from Pool
