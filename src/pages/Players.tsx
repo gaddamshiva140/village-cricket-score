@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ArrowLeft, Plus, Trash2, Camera, Pencil, User } from 'lucide-react';
 import { getAllPlayers, savePlayer, deletePlayer, SavedPlayer } from '@/lib/playerStore';
 import { PlayerRole } from '@/types/cricket';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -61,14 +62,24 @@ export default function Players() {
       photoUrl: photoUrl || undefined,
       createdAt: editPlayer?.createdAt || Date.now(),
     };
-    await savePlayer(player);
-    setShowDialog(false);
-    refresh();
+    try {
+      await savePlayer(player);
+      toast.success(editPlayer ? 'Player updated successfully' : 'Player saved successfully');
+      setShowDialog(false);
+      refresh();
+    } catch {
+      toast.error('Failed to save player');
+    }
   };
 
   const handleDelete = async (id: string) => {
-    await deletePlayer(id);
-    refresh();
+    try {
+      await deletePlayer(id);
+      toast.success('Player deleted successfully');
+      refresh();
+    } catch {
+      toast.error('Failed to delete player');
+    }
   };
 
   const handlePhoto = () => {

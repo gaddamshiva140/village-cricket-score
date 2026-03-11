@@ -30,25 +30,28 @@ export async function getAllPlayers(): Promise<SavedPlayer[]> {
 }
 
 export async function savePlayer(player: SavedPlayer) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-
   const { error } = await supabase
     .from('players')
     .upsert({
       id: player.id,
-      user_id: user.id,
+      user_id: 'anonymous',
       name: player.name,
       role: player.role || null,
       photo_url: player.photoUrl || null,
     }, { onConflict: 'id' });
 
-  if (error) console.error('Error saving player:', error);
+  if (error) {
+    console.error('Error saving player:', error);
+    throw error;
+  }
 }
 
 export async function deletePlayer(id: string) {
   const { error } = await supabase.from('players').delete().eq('id', id);
-  if (error) console.error('Error deleting player:', error);
+  if (error) {
+    console.error('Error deleting player:', error);
+    throw error;
+  }
 }
 
 export async function getPlayersByIds(ids: string[]): Promise<SavedPlayer[]> {

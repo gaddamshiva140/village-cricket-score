@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, PlusCircle, Clock, Sun, Moon } from 'lucide-react';
+import { Home, PlusCircle, Clock, Sun, Moon, Settings } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 import { getActiveMatchId } from '@/lib/matchStore';
 
@@ -12,9 +12,9 @@ export default function BottomNav() {
     { to: '/', icon: Home, label: 'Home' },
     { to: '/create', icon: PlusCircle, label: 'New Match' },
     { to: '/history', icon: Clock, label: 'History' },
+    { to: '/settings', icon: Settings, label: 'Settings' },
   ];
 
-  // If there's an active match, add a live link
   if (activeMatch) {
     links.splice(2, 0, {
       to: `/score/${activeMatch}`,

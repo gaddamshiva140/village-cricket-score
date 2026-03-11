@@ -7,6 +7,7 @@ import { ArrowLeft, Plus, Trash2, Users, Crown, Pencil, User, X, Camera } from '
 import { getAllTeams, saveTeam, deleteTeam, getNextTeamNumber, SavedTeam } from '@/lib/teamStore';
 import { getAllPlayers, SavedPlayer } from '@/lib/playerStore';
 import { Player } from '@/types/cricket';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -69,14 +70,24 @@ export default function Teams() {
       logoUrl: logoUrl || undefined,
       createdAt: editTeam?.createdAt || Date.now(),
     };
-    await saveTeam(team);
-    setShowCreate(false);
-    refresh();
+    try {
+      await saveTeam(team);
+      toast.success(editTeam ? 'Team updated successfully' : 'Team created successfully');
+      setShowCreate(false);
+      refresh();
+    } catch {
+      toast.error('Failed to save team');
+    }
   };
 
   const handleDelete = async (id: string) => {
-    await deleteTeam(id);
-    refresh();
+    try {
+      await deleteTeam(id);
+      toast.success('Team deleted successfully');
+      refresh();
+    } catch {
+      toast.error('Failed to delete team');
+    }
   };
 
   const toggleCaptain = (playerId: string) => {

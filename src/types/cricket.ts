@@ -8,7 +8,7 @@ export interface Player {
   role?: PlayerRole;
   battingStyle?: BattingStyle;
   isCaptain?: boolean;
-  photoUrl?: string; // base64 data URL
+  photoUrl?: string;
 }
 
 export interface BatsmanScore {
@@ -27,7 +27,7 @@ export interface BowlerFigures {
   playerId: string;
   playerName: string;
   overs: number;
-  balls: number; // balls in current over
+  balls: number;
   runs: number;
   wickets: number;
   noBalls: number;
@@ -41,14 +41,14 @@ export interface BallEvent {
   overNumber: number;
   ballNumber: number;
   runs: number;
-  batsmanRuns: number; // runs credited to batsman
+  batsmanRuns: number;
   extras: number;
   ballType: BallType;
   isWicket: boolean;
   dismissalType?: DismissalType;
   batsmanId: string;
   bowlerId: string;
-  isLegal: boolean; // wides and no-balls are not legal
+  isLegal: boolean;
   timestamp: number;
 }
 
@@ -61,7 +61,7 @@ export interface InningsData {
   totalRuns: number;
   totalWickets: number;
   totalOvers: number;
-  totalBalls: number; // legal balls bowled
+  totalBalls: number;
   extras: {
     wides: number;
     noBalls: number;
@@ -70,12 +70,12 @@ export interface InningsData {
     total: number;
   };
   ballEvents: BallEvent[];
-  currentBatsmanIndex: number; // index in battingOrder for striker
+  currentBatsmanIndex: number;
   nonStrikerIndex: number;
-  currentBowlerIndex: number; // index in bowlingFigures
+  currentBowlerIndex: number;
   isCompleted: boolean;
-  target?: number; // only for 2nd innings
-  lastOverBowlerIndex?: number; // track last over's bowler to prevent consecutive overs
+  target?: number;
+  lastOverBowlerIndex?: number;
   partnerships: Partnership[];
   currentPartnership: Partnership;
 }
@@ -105,15 +105,39 @@ export interface MatchSetup {
   battingFirst: 'A' | 'B';
 }
 
+export interface SuperOverInnings {
+  teamName: string;
+  teamId: string;
+  batsmen: BatsmanScore[];
+  bowler: BowlerFigures;
+  totalRuns: number;
+  totalWickets: number;
+  totalBalls: number;
+  ballEvents: BallEvent[];
+  currentBatsmanIndex: number;
+  nonStrikerIndex: number;
+  isCompleted: boolean;
+  target?: number;
+}
+
+export interface SuperOverData {
+  tossWinner: 'A' | 'B';
+  battingFirst: 'A' | 'B';
+  innings: [SuperOverInnings, SuperOverInnings];
+  currentInnings: 0 | 1;
+  result?: string;
+}
+
 export interface Match {
   id: string;
   setup: MatchSetup;
   innings: [InningsData, InningsData];
   currentInnings: 0 | 1;
-  status: 'live' | 'completed' | 'abandoned';
+  status: 'live' | 'completed' | 'abandoned' | 'tied';
   result?: string;
-  playerOfTheMatch?: string; // player id
+  playerOfTheMatch?: string;
   playerOfTheMatchName?: string;
+  superOver?: SuperOverData;
   createdAt: number;
   updatedAt: number;
 }

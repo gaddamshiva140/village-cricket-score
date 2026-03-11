@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { PlusCircle, Clock, Trophy, Users, User, LogOut } from 'lucide-react';
+import { PlusCircle, Clock, Trophy, Users, User, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getAllMatches, getActiveMatchId, getOversString } from '@/lib/matchStore';
 import { Match } from '@/types/cricket';
-import { useAuth } from '@/hooks/useAuth';
 
 export default function Home() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
   const activeMatchId = getActiveMatchId();
-  const { user, signOut } = useAuth();
+  const scorerName = localStorage.getItem('scorer_name');
+  const scorerAvatar = localStorage.getItem('scorer_avatar');
 
   useEffect(() => {
     getAllMatches().then(m => {
@@ -29,15 +29,22 @@ export default function Home() {
         <div className="mx-auto max-w-lg">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
-              <span className="text-3xl">🏏</span>
+              {scorerAvatar ? (
+                <img src={scorerAvatar} alt="Scorer" className="w-10 h-10 rounded-full object-cover border-2 border-primary-foreground/30" />
+              ) : (
+                <span className="text-3xl">🏏</span>
+              )}
               <h1 className="text-3xl font-black tracking-tight">Village Cricket Pro</h1>
             </div>
-            <Button variant="ghost" size="icon" className="text-primary-foreground/80 hover:text-primary-foreground" onClick={signOut}>
-              <LogOut className="h-5 w-5" />
-            </Button>
+            <Link to="/settings">
+              <Button variant="ghost" size="icon" className="text-primary-foreground/80 hover:text-primary-foreground">
+                <Settings className="h-5 w-5" />
+              </Button>
+            </Link>
           </div>
-          <p className="text-primary-foreground/80 font-medium">Score your village matches like a pro</p>
-          {user && <p className="text-primary-foreground/60 text-xs mt-1">{user.email}</p>}
+          <p className="text-primary-foreground/80 font-medium">
+            {scorerName ? `Welcome, ${scorerName}!` : 'Score your village matches like a pro'}
+          </p>
         </div>
       </div>
 
