@@ -34,7 +34,7 @@ export async function savePlayer(player: SavedPlayer) {
     .from('players')
     .upsert({
       id: player.id,
-      user_id: 'anonymous',
+      user_id: '00000000-0000-0000-0000-000000000000',
       name: player.name,
       role: player.role || null,
       photo_url: player.photoUrl || null,

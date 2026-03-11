@@ -42,7 +42,7 @@ export async function saveMatch(match: Match) {
     .from('matches')
     .upsert({
       id: match.id,
-      user_id: 'anonymous',
+      user_id: '00000000-0000-0000-0000-000000000000',
       setup: setupWithSuperOver as any,
       innings: match.innings as any,
       current_innings: match.currentInnings,

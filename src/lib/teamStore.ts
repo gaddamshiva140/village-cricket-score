@@ -53,7 +53,7 @@ export async function saveTeam(team: SavedTeam) {
     .from('teams')
     .upsert({
       id: team.id,
-      user_id: 'anonymous',
+      user_id: '00000000-0000-0000-0000-000000000000',
       name: team.name,
       player_ids: team.players.map(p => p.id),
       logo_url: team.logoUrl || null,
