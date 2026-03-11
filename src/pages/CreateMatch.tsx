@@ -10,6 +10,7 @@ import { createMatch } from '@/lib/matchStore';
 import { getAllTeams, SavedTeam } from '@/lib/teamStore';
 import CoinToss from '@/components/CoinToss';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 
 const OVERS_OPTIONS = [6, 8, 10, 12, 20];
 
@@ -51,6 +52,7 @@ export default function CreateMatch() {
     };
 
     const match = await createMatch(setup);
+    toast.success('Match created successfully');
     navigate(`/score/${match.id}`);
   };
 

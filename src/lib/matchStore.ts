@@ -23,25 +23,27 @@ function rowToMatch(row: any): Match {
     setup: row.setup as MatchSetup,
     innings: row.innings as [InningsData, InningsData],
     currentInnings: row.current_innings as 0 | 1,
-    status: row.status as 'live' | 'completed' | 'abandoned',
+    status: row.status as 'live' | 'completed' | 'abandoned' | 'tied',
     result: row.result || undefined,
     playerOfTheMatch: row.player_of_the_match || undefined,
     playerOfTheMatchName: row.player_of_the_match_name || undefined,
+    superOver: (row.setup as any)?.superOver || undefined,
     createdAt: new Date(row.created_at).getTime(),
     updatedAt: new Date(row.updated_at).getTime(),
   };
 }
 
 export async function saveMatch(match: Match) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  const setupWithSuperOver = match.superOver 
+    ? { ...match.setup, superOver: match.superOver } 
+    : match.setup;
 
   const { error } = await supabase
     .from('matches')
     .upsert({
       id: match.id,
-      user_id: user.id,
-      setup: match.setup as any,
+      user_id: '00000000-0000-0000-0000-000000000000',
+      setup: setupWithSuperOver as any,
       innings: match.innings as any,
       current_innings: match.currentInnings,
       status: match.status,
@@ -304,13 +306,17 @@ export function recordBall(
       match.currentInnings = 1;
       match.innings[1].target = innings.totalRuns + 1;
     } else {
-      match.status = 'completed';
-      match.result = calculateResult(match);
+      const result = calculateResult(match);
+      match.result = result;
+      if (result === 'Match Tied') {
+        match.status = 'tied';
+      } else {
+        match.status = 'completed';
+      }
     }
   }
 
   match.updatedAt = Date.now();
-  // Fire and forget - don't await during live scoring for responsiveness
   saveMatch(match);
   return { match, event, animationType };
 }
@@ -379,6 +385,9 @@ function calculateResult(match: Match): string {
   }
 
   const runDiff = inn1.totalRuns - inn2.totalRuns;
+  if (runDiff === 0) {
+    return 'Match Tied';
+  }
   return `${inn1.teamName} won by ${runDiff} run${runDiff !== 1 ? 's' : ''}`;
 }
 
@@ -434,8 +443,13 @@ export function retireOut(match: Match): { match: Match; needsNextBatsman: boole
       match.currentInnings = 1;
       match.innings[1].target = innings.totalRuns + 1;
     } else {
-      match.status = 'completed';
-      match.result = calculateResult(match);
+      const result = calculateResult(match);
+      match.result = result;
+      if (result === 'Match Tied') {
+        match.status = 'tied';
+      } else {
+        match.status = 'completed';
+      }
     }
   }
 

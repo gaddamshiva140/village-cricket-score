@@ -26,7 +26,7 @@ export type Database = {
           setup: Json
           status: string
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -39,7 +39,7 @@ export type Database = {
           setup: Json
           status?: string
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -52,7 +52,7 @@ export type Database = {
           setup?: Json
           status?: string
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -64,7 +64,7 @@ export type Database = {
           photo_url: string | null
           role: string | null
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -73,7 +73,7 @@ export type Database = {
           photo_url?: string | null
           role?: string | null
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -82,7 +82,7 @@ export type Database = {
           photo_url?: string | null
           role?: string | null
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -93,7 +93,7 @@ export type Database = {
           display_name: string | null
           id: string
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -101,7 +101,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -109,7 +109,7 @@ export type Database = {
           display_name?: string | null
           id?: string
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -121,7 +121,7 @@ export type Database = {
           name: string
           player_ids: string[] | null
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -130,7 +130,7 @@ export type Database = {
           name: string
           player_ids?: string[] | null
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -139,7 +139,7 @@ export type Database = {
           name?: string
           player_ids?: string[] | null
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }

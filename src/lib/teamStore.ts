@@ -20,7 +20,6 @@ export async function getAllTeams(): Promise<SavedTeam[]> {
     return [];
   }
 
-  // We need to fetch players for each team
   const allPlayerIds = (data || []).flatMap(t => t.player_ids || []);
   let playerMap: Record<string, Player> = {};
 
@@ -50,25 +49,28 @@ export async function getAllTeams(): Promise<SavedTeam[]> {
 }
 
 export async function saveTeam(team: SavedTeam) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-
   const { error } = await supabase
     .from('teams')
     .upsert({
       id: team.id,
-      user_id: user.id,
+      user_id: '00000000-0000-0000-0000-000000000000',
       name: team.name,
       player_ids: team.players.map(p => p.id),
       logo_url: team.logoUrl || null,
     }, { onConflict: 'id' });
 
-  if (error) console.error('Error saving team:', error);
+  if (error) {
+    console.error('Error saving team:', error);
+    throw error;
+  }
 }
 
 export async function deleteTeam(id: string) {
   const { error } = await supabase.from('teams').delete().eq('id', id);
-  if (error) console.error('Error deleting team:', error);
+  if (error) {
+    console.error('Error deleting team:', error);
+    throw error;
+  }
 }
 
 export async function getNextTeamNumber(): Promise<number> {

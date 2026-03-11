@@ -7,10 +7,13 @@ import { ArrowLeft, Undo2, RotateCcw, UserRound, LogOut, Shield } from 'lucide-r
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { getMatch, recordBall, undoLastBall, getCurrentInnings, getOversString, getRunRate, changeBowler, swapStrike, saveMatch, setActiveMatchId, retireOut } from '@/lib/matchStore';
-import { Match, BallType, DismissalType } from '@/types/cricket';
+import { Match, BallType, DismissalType, SuperOverData } from '@/types/cricket';
 import CricketAnimation from '@/components/CricketAnimation';
 import OversProgress from '@/components/OversProgress';
 import WinPrediction from '@/components/WinPrediction';
+import MatchTiedOverlay from '@/components/MatchTiedOverlay';
+import SuperOverScoring from '@/components/SuperOverScoring';
+import { audioManager } from '@/lib/audioManager';
 
 const DISMISSAL_TYPES: DismissalType[] = ['Bowled', 'Caught', 'LBW', 'Run Out', 'Stumped', 'Hit Wicket'];
 
@@ -31,6 +34,8 @@ export default function LiveScoring() {
   const [setupStrikerId, setSetupStrikerId] = useState<string>('');
   const [setupNonStrikerId, setSetupNonStrikerId] = useState<string>('');
   const [setupBowlerId, setSetupBowlerId] = useState<string>('');
+  const [showTiedOverlay, setShowTiedOverlay] = useState(false);
+  const [showSuperOver, setShowSuperOver] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -40,9 +45,12 @@ export default function LiveScoring() {
             navigate(`/scorecard/${id}`);
             return;
           }
+          if (m.status === 'tied' && !m.superOver) {
+            setShowTiedOverlay(true);
+          }
           setMatch(m);
           const currentInnings = m.innings[m.currentInnings];
-          if (currentInnings.totalBalls === 0) {
+          if (currentInnings.totalBalls === 0 && m.status === 'live') {
             setShowInningsSetup(true);
           }
         }
@@ -59,7 +67,22 @@ export default function LiveScoring() {
     if (result.animationType) {
       setAnimation(result.animationType);
     }
+
+    // Play audio
+    if (isWicket) audioManager.playWicket();
+    else if (runs === 4 && (ballType === 'normal' || ballType === 'noball')) audioManager.playFour();
+    else if (runs === 6 && (ballType === 'normal' || ballType === 'noball')) audioManager.playSix();
+
     setMatch({ ...result.match });
+
+    // Check for tie
+    if (result.match.status === 'tied') {
+      audioManager.playMatchTied();
+      setTimeout(() => {
+        setShowTiedOverlay(true);
+      }, result.animationType ? 2500 : 500);
+      return;
+    }
 
     if (result.match.status === 'completed') {
       setTimeout(() => {
@@ -103,6 +126,12 @@ export default function LiveScoring() {
     const result = retireOut(match);
     setMatch({ ...result.match });
 
+    if (result.match.status === 'tied') {
+      audioManager.playMatchTied();
+      setTimeout(() => setShowTiedOverlay(true), 500);
+      return;
+    }
+
     if (result.match.status === 'completed') {
       setTimeout(() => {
         setActiveMatchId(null);
@@ -120,7 +149,6 @@ export default function LiveScoring() {
     if (!match) return;
     const innings = getCurrentInnings(match);
     innings.currentBatsmanIndex = batsmanIndex;
-    // Update current partnership with correct batsman
     const newBatsman = innings.battingOrder[batsmanIndex];
     const nonStriker = innings.battingOrder[innings.nonStrikerIndex];
     innings.currentPartnership.batsman1Id = newBatsman.playerId;
@@ -190,6 +218,28 @@ export default function LiveScoring() {
     setOverCompleteMessage(null);
   }, [match, bowlerSelectRequired]);
 
+  const handleStartSuperOver = useCallback(() => {
+    setShowTiedOverlay(false);
+    audioManager.playSuperOverIntro();
+    setShowSuperOver(true);
+  }, []);
+
+  const handleSuperOverComplete = useCallback((result: string, superOverData: SuperOverData) => {
+    if (!match) return;
+    match.superOver = superOverData;
+    match.status = 'completed';
+    match.result = `Match Tied. ${result}`;
+    match.updatedAt = Date.now();
+    saveMatch(match);
+    setActiveMatchId(null);
+    navigate(`/scorecard/${match.id}?potm=true`);
+  }, [match, navigate]);
+
+  // Show Super Over UI
+  if (showSuperOver && match) {
+    return <SuperOverScoring match={match} onComplete={handleSuperOverComplete} />;
+  }
+
   if (!match) return <div className="flex items-center justify-center min-h-screen"><p>Loading...</p></div>;
 
   const innings = getCurrentInnings(match);
@@ -203,11 +253,6 @@ export default function LiveScoring() {
     : (match.setup.battingFirst === 'A' ? match.setup.teamA.players : match.setup.teamB.players);
   const bowlerPlayer = bowlingTeamPlayers.find(p => p.id === bowler?.playerId);
 
-  const currentOverBalls = innings.ballEvents.filter(e => {
-    const currentOver = Math.floor(innings.totalBalls / 6);
-    const ballOver = innings.totalBalls % 6 === 0 && innings.totalBalls > 0 ? currentOver - 1 : currentOver;
-    return e.overNumber === (innings.totalBalls % 6 === 0 && innings.totalBalls > 0 ? currentOver : ballOver);
-  });
   const recentBalls = innings.ballEvents.slice(-6);
 
   const PlayerAvatar = ({ player, size = 'w-7 h-7', textSize = 'text-xs' }: { player?: { name: string; photoUrl?: string }; size?: string; textSize?: string }) => (
@@ -222,6 +267,7 @@ export default function LiveScoring() {
 
   return (
     <div className="min-h-screen pb-24 bg-background">
+      {showTiedOverlay && <MatchTiedOverlay onStartSuperOver={handleStartSuperOver} />}
       <CricketAnimation type={animation} onComplete={() => setAnimation(null)} />
 
       {/* Header */}
@@ -258,7 +304,6 @@ export default function LiveScoring() {
           <OversProgress totalBalls={innings.totalBalls} totalOvers={match.setup.totalOvers} />
         </Card>
 
-        {/* Win Prediction */}
         <WinPrediction match={match} />
 
         {/* Batsmen & Bowler */}
@@ -282,7 +327,6 @@ export default function LiveScoring() {
               <span className="font-mono text-muted-foreground">{nonStriker?.runs} ({nonStriker?.balls})</span>
             </div>
 
-            {/* Partnership */}
             <div className="border-t pt-2 flex items-center justify-between text-xs text-muted-foreground">
               <span>Partnership</span>
               <span className="font-mono font-bold text-foreground">
@@ -538,7 +582,6 @@ export default function LiveScoring() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Batting Team Label */}
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
               🏏 {innings.teamName} - Batting
             </p>
@@ -593,7 +636,6 @@ export default function LiveScoring() {
               </Select>
             </div>
 
-            {/* Bowling Team Label */}
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
               ⚾ {match.currentInnings === 0 
                 ? (match.setup.battingFirst === 'A' ? match.setup.teamB.name : match.setup.teamA.name)
