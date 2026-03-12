@@ -14,6 +14,9 @@ import WinPrediction from '@/components/WinPrediction';
 import MatchTiedOverlay from '@/components/MatchTiedOverlay';
 import SuperOverScoring from '@/components/SuperOverScoring';
 import { audioManager } from '@/lib/audioManager';
+import { speechManager } from '@/lib/speechManager';
+import { t } from '@/lib/i18n';
+
 
 const DISMISSAL_TYPES: DismissalType[] = ['Bowled', 'Caught', 'LBW', 'Run Out', 'Stumped', 'Hit Wicket'];
 
@@ -68,10 +71,11 @@ export default function LiveScoring() {
       setAnimation(result.animationType);
     }
 
-    // Play audio
+    // Play audio & speech commentary
     if (isWicket) audioManager.playWicket();
     else if (runs === 4 && (ballType === 'normal' || ballType === 'noball')) audioManager.playFour();
     else if (runs === 6 && (ballType === 'normal' || ballType === 'noball')) audioManager.playSix();
+    speechManager.announceBall(runs, ballType, isWicket);
 
     setMatch({ ...result.match });
 
@@ -115,9 +119,11 @@ export default function LiveScoring() {
     const isLegal = ballType !== 'wide' && ballType !== 'noball';
     if (isLegal && currentInnings.totalBalls > 0 && currentInnings.totalBalls % 6 === 0 && !currentInnings.isCompleted) {
       const completedOver = Math.floor(currentInnings.totalBalls / 6);
-      setOverCompleteMessage(`Over ${completedOver} Completed!`);
+      setOverCompleteMessage(`${t('score.overComplete')} - Over ${completedOver}!`);
       setBowlerSelectRequired(true);
       setShowBowlerSelect(true);
+      // Over summary speech
+      speechManager.announceOverSummary(completedOver, currentInnings.totalRuns, currentInnings.totalWickets);
     }
   }, [match, navigate]);
 
