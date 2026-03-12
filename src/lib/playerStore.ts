@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { PlayerRole } from '@/types/cricket';
+import { t } from '@/lib/i18n';
 
 export interface SavedPlayer {
   id: string;
@@ -10,67 +11,92 @@ export interface SavedPlayer {
 }
 
 export async function getAllPlayers(): Promise<SavedPlayer[]> {
-  const { data, error } = await supabase
-    .from('players')
-    .select('*')
-    .order('created_at', { ascending: false });
+  try {
+    const { data, error } = await supabase
+      .from('players')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching players:', error);
+    if (error) {
+      console.error('Error fetching players:', error);
+      return [];
+    }
+
+    return (data || []).map(p => ({
+      id: p.id,
+      name: p.name,
+      role: p.role as PlayerRole | undefined,
+      photoUrl: p.photo_url || undefined,
+      createdAt: new Date(p.created_at).getTime(),
+    }));
+  } catch (e) {
+    console.error('Failed to fetch players:', e);
     return [];
   }
-
-  return (data || []).map(p => ({
-    id: p.id,
-    name: p.name,
-    role: p.role as PlayerRole | undefined,
-    photoUrl: p.photo_url || undefined,
-    createdAt: new Date(p.created_at).getTime(),
-  }));
 }
 
 export async function savePlayer(player: SavedPlayer) {
-  const { error } = await supabase
-    .from('players')
-    .upsert({
-      id: player.id,
-      user_id: '00000000-0000-0000-0000-000000000000',
-      name: player.name,
-      role: player.role || null,
-      photo_url: player.photoUrl || null,
-    }, { onConflict: 'id' });
+  if (!player || !player.name?.trim()) {
+    throw new Error('Invalid player data: name is required');
+  }
 
-  if (error) {
-    console.error('Error saving player:', error);
-    throw error;
+  try {
+    const { error } = await supabase
+      .from('players')
+      .upsert({
+        id: player.id,
+        user_id: '00000000-0000-0000-0000-000000000000',
+        name: player.name.trim(),
+        role: player.role || null,
+        photo_url: player.photoUrl || null,
+      }, { onConflict: 'id' });
+
+    if (error) {
+      console.error('Error saving player:', error);
+      throw error;
+    }
+  } catch (e) {
+    console.error('Failed to save player:', e);
+    throw e;
   }
 }
 
 export async function deletePlayer(id: string) {
-  const { error } = await supabase.from('players').delete().eq('id', id);
-  if (error) {
-    console.error('Error deleting player:', error);
-    throw error;
+  if (!id) throw new Error('Invalid player id');
+  try {
+    const { error } = await supabase.from('players').delete().eq('id', id);
+    if (error) {
+      console.error('Error deleting player:', error);
+      throw error;
+    }
+  } catch (e) {
+    console.error('Failed to delete player:', e);
+    throw e;
   }
 }
 
 export async function getPlayersByIds(ids: string[]): Promise<SavedPlayer[]> {
-  if (ids.length === 0) return [];
-  const { data, error } = await supabase
-    .from('players')
-    .select('*')
-    .in('id', ids);
+  if (!ids || ids.length === 0) return [];
+  try {
+    const { data, error } = await supabase
+      .from('players')
+      .select('*')
+      .in('id', ids);
 
-  if (error) {
-    console.error('Error fetching players by ids:', error);
+    if (error) {
+      console.error('Error fetching players by ids:', error);
+      return [];
+    }
+
+    return (data || []).map(p => ({
+      id: p.id,
+      name: p.name,
+      role: p.role as PlayerRole | undefined,
+      photoUrl: p.photo_url || undefined,
+      createdAt: new Date(p.created_at).getTime(),
+    }));
+  } catch (e) {
+    console.error('Failed to fetch players by ids:', e);
     return [];
   }
-
-  return (data || []).map(p => ({
-    id: p.id,
-    name: p.name,
-    role: p.role as PlayerRole | undefined,
-    photoUrl: p.photo_url || undefined,
-    createdAt: new Date(p.created_at).getTime(),
-  }));
 }
