@@ -71,10 +71,11 @@ export default function LiveScoring() {
       setAnimation(result.animationType);
     }
 
-    // Play audio
+    // Play audio & speech commentary
     if (isWicket) audioManager.playWicket();
     else if (runs === 4 && (ballType === 'normal' || ballType === 'noball')) audioManager.playFour();
     else if (runs === 6 && (ballType === 'normal' || ballType === 'noball')) audioManager.playSix();
+    speechManager.announceBall(runs, ballType, isWicket);
 
     setMatch({ ...result.match });
 
