@@ -118,9 +118,11 @@ export default function LiveScoring() {
     const isLegal = ballType !== 'wide' && ballType !== 'noball';
     if (isLegal && currentInnings.totalBalls > 0 && currentInnings.totalBalls % 6 === 0 && !currentInnings.isCompleted) {
       const completedOver = Math.floor(currentInnings.totalBalls / 6);
-      setOverCompleteMessage(`Over ${completedOver} Completed!`);
+      setOverCompleteMessage(`${t('score.overComplete')} - Over ${completedOver}!`);
       setBowlerSelectRequired(true);
       setShowBowlerSelect(true);
+      // Over summary speech
+      speechManager.announceOverSummary(completedOver, currentInnings.totalRuns, currentInnings.totalWickets);
     }
   }, [match, navigate]);
 
