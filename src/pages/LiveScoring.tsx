@@ -14,6 +14,9 @@ import WinPrediction from '@/components/WinPrediction';
 import MatchTiedOverlay from '@/components/MatchTiedOverlay';
 import SuperOverScoring from '@/components/SuperOverScoring';
 import { audioManager } from '@/lib/audioManager';
+import { speechManager } from '@/lib/speechManager';
+import { t } from '@/lib/i18n';
+
 
 const DISMISSAL_TYPES: DismissalType[] = ['Bowled', 'Caught', 'LBW', 'Run Out', 'Stumped', 'Hit Wicket'];
 
